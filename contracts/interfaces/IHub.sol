@@ -8,9 +8,5 @@ pragma solidity >=0.4.22 <0.9.0;
 interface IHub {
     function processMessage(bytes memory _data) external;
 
-    function addSpokeBridge(
-        address _srcContract,
-        uint32 _srcChainId,
-        address _dstContract,
-        uint32 _dstChainId) external;
+    function addSpokeBridge(address _srcContract, address _dstContract) external;
 }
