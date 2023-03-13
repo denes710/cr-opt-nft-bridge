@@ -3,8 +3,8 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import {ISpokeBridge} from "./interfaces/ISpokeBridge.sol";
 
-import {Ownable} from "openzeppelin-solidity/contracts/access/Ownable.sol";
-import {Counters} from "openzeppelin-solidity/contracts/utils/Counters.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
 // FIXME comments
 /**

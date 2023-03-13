@@ -3,8 +3,8 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import {IWrappedERC721} from "./interfaces/IWrappedERC721.sol";
 
-import {ERC721} from "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
-import {Ownable} from "openzeppelin-solidity/contracts/access/Ownable.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // FIXME comments
 /**

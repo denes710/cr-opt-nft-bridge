@@ -4,7 +4,7 @@ pragma solidity >=0.4.22 <0.9.0;
 import {IHub} from "../interfaces/IHub.sol";
 import {ISpokeBridge} from "../interfaces/ISpokeBridge.sol";
 
-import {Ownable} from "openzeppelin-solidity/contracts/access/Ownable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // FIXME comments
 /**

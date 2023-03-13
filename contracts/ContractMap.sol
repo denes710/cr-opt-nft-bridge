@@ -3,7 +3,7 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import {IContractMap} from "./interfaces/IContractMap.sol";
 
-import {Ownable} from "openzeppelin-solidity/contracts/access/Ownable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // FIXME comments
 /**

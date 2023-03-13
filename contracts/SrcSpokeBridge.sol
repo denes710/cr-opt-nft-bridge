@@ -6,8 +6,8 @@ import {ISrcSpokeBridge} from "./interfaces/ISrcSpokeBridge.sol";
 
 import {SpokeBridge} from "./SpokeBridge.sol";
 
-import {ERC721} from "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
-import {Counters} from "openzeppelin-solidity/contracts/utils/Counters.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
 // FIXME comments
 /**
