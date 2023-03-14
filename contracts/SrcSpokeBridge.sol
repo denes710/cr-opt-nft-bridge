@@ -139,7 +139,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             require(localChallengedBid.status != OutgoingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
             require(localChallengedBid.timestampOfBought + 4 hours < block.timestamp, "SrcSpokeBridge: Time window is not expired!");
 
-            if (status != IncomingBidStatus.Malicious && // FIXME questionable
+            if (status != IncomingBidStatus.Malicious &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.remoteErc721Contract == remoteContract &&

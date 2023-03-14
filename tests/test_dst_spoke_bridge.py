@@ -98,7 +98,6 @@ def test_user_creating_bid(init_contracts):
 
     dstSpokeBridge.createBid(user, 1, wrappedErc721.address, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
 
-    # FIXME add checks for members
     retBid = dstSpokeBridge.outgoingBids(0)
     assert retBid["status"] == 1
     assert retBid["receiver"] == user

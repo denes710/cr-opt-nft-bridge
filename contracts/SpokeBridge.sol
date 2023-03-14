@@ -13,13 +13,14 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
 
+    // FIXME outgoing and incoming bid are different a little bit on dst and src sides
     enum OutgoingBidStatus {
         None,
         Created,
         Bought,
         Challenged,
         Malicious,
-        Unlocked // FIXME it is used only on src
+        Unlocked // it is used only on src
     }
 
     enum IncomingBidStatus {
@@ -27,7 +28,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         Relayed,
         Challenged,
         Malicious,
-        Unlocked // FIXME it is used only on src
+        Unlocked // it is used only on src
     }
 
     struct OutgoingBid {
@@ -39,19 +40,19 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         address receiver;
         uint256 tokenId;
         address localErc721Contract;
-        address remoteErc721Contract; // FIXME it is not relevant on the dst side
+        address remoteErc721Contract; // it is not relevant on the dst side
         uint256 timestampOfBought;
         // the relayer
         address buyer;
     }
 
     struct IncomingBid {
-        uint256 outgoingId; // FIXME it is not relevant on the dst side
+        uint256 outgoingId; // it is not relevant on the dst side
         IncomingBidStatus status;
         address receiver;
         uint256 tokenId;
         // it is always an address on the dst chain
-        address remoteErc721Contract; // FIXME it is not relevant on the src side
+        address remoteErc721Contract; // it is not relevant on the src side
         uint256 timestampOfRelayed;
         address relayer;
     }
