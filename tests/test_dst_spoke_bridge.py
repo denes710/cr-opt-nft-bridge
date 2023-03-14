@@ -15,7 +15,6 @@ def init_contracts():
 
     return dstSpokeBridge, wrappedErc721
 
-# TODO add balance checks for every place where transfer happens
 def test_relayer_depositing(init_contracts):
     dstSpokeBridge, wrappedErc721 = init_contracts
 
@@ -125,7 +124,9 @@ def test_relayer_buying_bid(init_contracts):
     with reverts("SpokeBridge: caller is not a relayer!"):
         dstSpokeBridge.buyBid(0, {'from': person});
 
+    prev_relayer_balance = relayer.balance()
     dstSpokeBridge.buyBid(0, {'from': relayer});
+    assert prev_relayer_balance + Wei("0.01 ether") == relayer.balance()
 
     with reverts("SpokeBridge: bid does not have Created state"):
         dstSpokeBridge.buyBid(0, {'from': relayer});

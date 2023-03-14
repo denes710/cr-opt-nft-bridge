@@ -26,7 +26,6 @@ def init_contracts():
 
     return srcSpokeBridge, dstSpokeBridge, contractMap, erc721, wrappedErc721
 
-# FIXME add balance checks for test cases
 def test_one_token_briging_circle_without_challenge(init_contracts):
     srcSpokeBridge, dstSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
 
@@ -70,6 +69,13 @@ def test_challenge_on_source_during_locking(init_contracts):
 
     # sending the proof of # id incoming message
     dstSpokeBridge.sendProof(False, 0, {'from': challenger})
+
+    prev_challenger_balance = challenger.balance()
+    srcSpokeBridge.claimChallengeReward(0, True, {'from': challenger})
+    assert prev_challenger_balance + Wei("5 ether") == challenger.balance()
+
+    with reverts("SpokeBridge: caller is not a relayer!"):
+        dstSpokeBridge.undeposite({'from': relayer})
 
     retRelayer = srcSpokeBridge.relayers(relayer)
     assert retRelayer["status"] == 4
@@ -169,8 +175,16 @@ def test_challenge_on_dest_during_burning(init_contracts):
     # sending the proof of # id incoming message
     srcSpokeBridge.sendProof(False, 0, {'from': challenger})
 
+    prev_challenger_balance = challenger.balance()
+    dstSpokeBridge.claimChallengeReward(0, True, {'from': challenger})
+    assert prev_challenger_balance + Wei("5 ether") == challenger.balance()
+
+    with reverts("SpokeBridge: caller is not a relayer!"):
+        dstSpokeBridge.undeposite({'from': relayer})
+
     retRelayer = dstSpokeBridge.relayers(relayer)
     assert retRelayer["status"] == 4
+
 
 def test_false_challenge_on_dest_during_burning(init_contracts):
     srcSpokeBridge, dstSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
@@ -279,6 +293,13 @@ def test_challenge_on_source_during_unlocking(init_contracts):
     srcSpokeBridge.challengeUnlocking(0, {'from': challenger, 'amount': Wei("10 ether")});
     dstSpokeBridge.sendProof(True, 0, {'from': challenger})
 
+    prev_challenger_balance = challenger.balance()
+    srcSpokeBridge.claimChallengeReward(0, False, {'from': challenger})
+    assert prev_challenger_balance + Wei("15 ether") == challenger.balance()
+
+    with reverts("SpokeBridge: caller is not a relayer!"):
+        dstSpokeBridge.undeposite({'from': relayer})
+
     retRelayer = srcSpokeBridge.relayers(relayer)
     assert retRelayer["status"] == 4
 
@@ -386,6 +407,13 @@ def test_challenge_on_dest_during_minting(init_contracts):
     # challenging
     dstSpokeBridge.challengeMinting(0, {'from': challenger, 'amount': Wei("10 ether")});
     srcSpokeBridge.sendProof(True, 0, {'from': challenger})
+
+    prev_challenger_balance = challenger.balance()
+    dstSpokeBridge.claimChallengeReward(0, False, {'from': challenger})
+    assert prev_challenger_balance + Wei("15 ether") == challenger.balance()
+
+    with reverts("SpokeBridge: caller is not a relayer!"):
+        srcSpokeBridge.undeposite({'from': relayer})
 
     retRelayer = dstSpokeBridge.relayers(relayer)
     assert retRelayer["status"] == 4

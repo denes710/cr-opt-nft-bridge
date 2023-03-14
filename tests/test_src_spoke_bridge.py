@@ -89,8 +89,9 @@ def test_relayer_buying_bid(init_contracts):
     with reverts("SpokeBridge: caller is not a relayer!"):
         srcSpokeBridge.buyBid(0, {'from': person});
 
-    # TODO checks for balance
+    prev_relayer_balance = relayer.balance()
     srcSpokeBridge.buyBid(0, {'from': relayer});
+    assert prev_relayer_balance + Wei("0.01 ether") == relayer.balance()
 
     with reverts("SpokeBridge: bid does not have Created state"):
         srcSpokeBridge.buyBid(0, {'from': relayer});
