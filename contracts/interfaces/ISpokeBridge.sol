@@ -29,4 +29,6 @@ interface ISpokeBridge is IERC721Receiver {
     function undeposite() external;
 
     function claimDeposite() external;
+
+    function claimChallengeReward(uint256 _challengeId, bool _isOutgoingBid) external;
 }

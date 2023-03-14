@@ -92,12 +92,21 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         ChallengeStatus status;
     }
 
+    struct Reward {
+        address challenger;
+        uint256 amount;
+        bool isClaimed;
+    }
+
     mapping(address => Relayer) public relayers;
 
     mapping(uint256 => IncomingBid) public incomingBids;
     mapping(uint256 => OutgoingBid) public outgoingBids;
 
     mapping(uint256 => Challenge) public challengedIncomingBids;
+
+    mapping(uint256 => Reward) public incomingChallengeRewards;
+    mapping(uint256 => Reward) public outgoingChallengeRewards;
 
     uint256 public immutable STAKE_AMOUNT;
 
@@ -163,9 +172,28 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         relayers[_msgSender()].status = RelayerStatus.None;
     }
 
-    function _sendMessage(bytes memory _data) internal virtual;
+    // FIXME add test cases
+    function claimChallengeReward(uint256 _challengeId, bool _isOutgoingBid) public override {
+        if (_isOutgoingBid) {
+            require(!outgoingChallengeRewards[_challengeId].isClaimed, "SpokeBridge: reward is already claimed!");
+            require(outgoingChallengeRewards[_challengeId].challenger == _msgSender(),
+                "SpokeBridge: challenger is not the sender!");
 
-    function _getCrossMessageSender() internal virtual returns (address);
+            outgoingChallengeRewards[_challengeId].isClaimed = true;
+
+            (bool isSent,) = _msgSender().call{value: outgoingChallengeRewards[_challengeId].amount}("");
+            require(isSent, "Failed to send Ether");
+        } else {
+            require(!incomingChallengeRewards[_challengeId].isClaimed, "SpokeBridge: reward is already claimed!");
+            require(incomingChallengeRewards[_challengeId].challenger == _msgSender(),
+                "SpokeBridge: challenger is not the sender!");
+
+            incomingChallengeRewards[_challengeId].isClaimed = true;
+            
+            (bool isSent,) = _msgSender().call{value: incomingChallengeRewards[_challengeId].amount}("");
+            require(isSent, "Failed to send Ether");
+        }
+    }
 
     /**
      * Always returns `IERC721Receiver.onERC721Received.selector`.
@@ -173,6 +201,10 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
         return this.onERC721Received.selector;
     }
+
+    function _sendMessage(bytes memory _data) internal virtual;
+
+    function _getCrossMessageSender() internal virtual returns (address);
 
     function _challengeUnlocking(uint256 _bidId) internal {
         require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");

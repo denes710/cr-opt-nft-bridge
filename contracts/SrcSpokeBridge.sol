@@ -99,7 +99,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             require(localChallengedBid.status != IncomingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
             require(localChallengedBid.timestampOfRelayed + 4 hours > block.timestamp, "SrcSpokeBridge: Time window is expired!");
 
-            if (status == OutgoingBidStatus.Bought &&
+            if (status == OutgoingBidStatus.Bought  &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.remoteErc721Contract == remoteContract &&
@@ -107,15 +107,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 // False challenging
                 localChallengedBid.status = IncomingBidStatus.Relayed;
                 relayers[localChallengedBid.relayer].status = RelayerStatus.Active;
-
-                if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
-                    // Dealing with the challenger
-                    challengedIncomingBids[bidId].status = ChallengeStatus.None;
-
-                    // FIXME claim can be better, in other case as well
-                    (bool isSent,) = challengedIncomingBids[bidId].challenger.call{value: CHALLENGE_AMOUNT/4}("");
-                    require(isSent, "Failed to send Ether");
-                }
+                challengedIncomingBids[bidId].status = ChallengeStatus.None;
             } else {
                 // Proved malicious bid(behavior)
                 localChallengedBid.status = IncomingBidStatus.Malicious;
@@ -125,11 +117,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
                 // Dealing with the challenger
                 if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
-
-                    (bool isSent,) = challengedIncomingBids[bidId].challenger.call{
-                        value: CHALLENGE_AMOUNT + STAKE_AMOUNT/3}("");
-
-                    require(isSent, "Failed to send Ether");
+                    incomingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
+                    incomingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 3;
                 }
                 challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
             }
@@ -150,7 +139,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             require(localChallengedBid.status != OutgoingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
             require(localChallengedBid.timestampOfBought + 4 hours < block.timestamp, "SrcSpokeBridge: Time window is not expired!");
 
-            if (status != IncomingBidStatus.Malicious &&
+            if (status != IncomingBidStatus.Malicious && // FIXME questionable
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.remoteErc721Contract == remoteContract &&
@@ -169,9 +158,10 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                     .safeTransferFrom(address(this), localChallengedBid.maker, localChallengedBid.tokenId);
 
                 // Dealing with the challenger
-                // TODO claiming approach
-                (bool isSent,) = challenger.call{value: STAKE_AMOUNT/3}("");
-                require(isSent, "Failed to send Ether");
+                if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
+                    outgoingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
+                    outgoingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 3;
+                }
             }
         }
     }
