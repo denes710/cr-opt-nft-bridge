@@ -197,7 +197,8 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
         address _erc721Contract
     )  public override onlyActiveRelayer {
         require(incomingBids[_bidId].status == IncomingBidStatus.None);
-        require(ERC721(_erc721Contract).ownerOf(_tokenId) == address(0));
+
+        IWrappedERC721(_erc721Contract).mint(_to, _tokenId);
 
         incomingBids[_bidId] = IncomingBid({
             remoteId:_bidId,
@@ -209,7 +210,5 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             timestampOfRelayed:block.timestamp,
             relayer:_msgSender()
         });
-
-        IWrappedERC721(_erc721Contract).mint(_to, _tokenId);
     }
 }
