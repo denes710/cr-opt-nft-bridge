@@ -6,10 +6,6 @@ import {IWrappedERC721} from "./interfaces/IWrappedERC721.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-// FIXME comments
-/**
- * @notice
- */
 contract WrappedERC721 is IWrappedERC721, ERC721, Ownable {
     constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
     }

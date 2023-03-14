@@ -10,9 +10,8 @@ import {SpokeBridge} from "./SpokeBridge.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
-// FIXME comments
 /**
- * @notice
+ * @notice This contract implements the functonalities for a bridge on the destination chain.
  */
 abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
     using Counters for Counters.Counter;
@@ -101,6 +100,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
     }
 
     function receiveProof(bytes memory _proof) public override onlyHub {
+        // TODO better naming for isOutGoingBid
         (bytes memory bidBytes, bool isOutgoingBid) = abi.decode(_proof, (bytes, bool));
         if (isOutgoingBid) {
             // On the dest chain during minting(wrong relaying), revert minting
@@ -113,7 +113,6 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 address relayer
             ) = abi.decode(bidBytes, (uint256, OutgoingBidStatus, address, uint256, address, address));
 
-            // FIXME time window check
             IncomingBid memory localChallengedBid = incomingBids[bidId];
 
             require(localChallengedBid.status != IncomingBidStatus.None, "DstSpokeBrdige: There is no corresponding local bid!");
@@ -132,7 +131,8 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                     // Dealing with the challenger
                     challengedIncomingBids[bidId].status = ChallengeStatus.None;
 
-                    // FIXME: Claim can be better !!!
+                    // TODO: claim version can be better, because the whole challenging is reverted
+                    // if the sending functionalities is failed!
                     (bool isSent,) = challengedIncomingBids[bidId].challenger.call{value: CHALLENGE_AMOUNT/4}("");
                     require(isSent, "Failed to send Ether");
                 }
@@ -208,7 +208,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
 
         incomingBids[_bidId] = IncomingBid({
             remoteId:_bidId,
-            outgoingId:0, // FIXME it is not relevant in Dst side
+            outgoingId:0,
             status:IncomingBidStatus.Relayed,
             receiver:_to,
             tokenId:_tokenId,

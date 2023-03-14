@@ -15,6 +15,7 @@ def init_contracts():
 
     return dstSpokeBridge, wrappedErc721
 
+# TODO add balance checks for every place where transfer happens
 def test_relayer_depositing(init_contracts):
     dstSpokeBridge, wrappedErc721 = init_contracts
 
@@ -61,7 +62,6 @@ def test_relayer_relaying(init_contracts):
 
     dstSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    # FIXME more tests
     dstSpokeBridge.minting(0, receiver, 1, wrappedErc721.address, {'from': relayer})
 
     retBid = dstSpokeBridge.incomingBids(0)
@@ -84,7 +84,6 @@ def test_user_creating_bid(init_contracts):
 
     dstSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    # FIXME more tests
     dstSpokeBridge.minting(0, receiver, 1, wrappedErc721.address, {'from': relayer})
 
     wrappedErc721.approve(dstSpokeBridge.address, 1, {'from': receiver})
@@ -101,7 +100,7 @@ def test_user_creating_bid(init_contracts):
 
     dstSpokeBridge.createBid(user, 1, wrappedErc721.address, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
 
-    # FIXME more members
+    # FIXME add checks for members
     retBid = dstSpokeBridge.outgoingBids(0)
     assert retBid["status"] == 1
     assert retBid["receiver"] == user

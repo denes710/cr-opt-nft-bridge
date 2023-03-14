@@ -5,10 +5,6 @@ import {IHub} from "../interfaces/IHub.sol";
 
 import {SrcSpokeBridge} from "../SrcSpokeBridge.sol";
 
-// FIXME comments
-/**
- * @notice
- */
 contract SimpleGatewaySrcSpokeBrdige is SrcSpokeBridge {
     constructor(address _hub, address _contractMap) SrcSpokeBridge(_contractMap, _hub) {
     }

@@ -5,19 +5,14 @@ import {IContractMap} from "./interfaces/IContractMap.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-// FIXME comments
 /**
- * @notice
+ * @notice This contract implements the functionality to match the addresses of the contracts on this chain
+ * with the addresses of other contracts on other chains.
  */
 contract ContractMap is IContractMap, Ownable {
-    /**
-     * @notice FIXME
-     */
+
     mapping(address => address) public localToRemote;
 
-    /**
-     * @notice FIXME
-     */
     mapping(address => address) public remoteToLocal;
 
     function addPair(address _local, address _remote) public override onlyOwner {

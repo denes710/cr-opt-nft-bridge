@@ -6,14 +6,7 @@ import {ISpokeBridge} from "../interfaces/ISpokeBridge.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-// FIXME comments
-/**
- * @notice
- */
 contract SimpleGatewayHub is IHub, Ownable {
-    /**
-     * @notice FIXME
-     */
     mapping(address => address) public bridgeToBrdige;
 
     function processMessage(bytes memory _data) public override {

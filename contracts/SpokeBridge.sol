@@ -6,17 +6,16 @@ import {ISpokeBridge} from "./interfaces/ISpokeBridge.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
-// FIXME comments
 /**
- * @notice
+ * @notice This abstract contract is the common base class for src and dst bridges.
+ * The src and dst bridges have lots of common functionalities.
  */
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
 
-    /**
-     * @dev Status of a bid:
-     *      0 - FIXME
-     */
+
+
+    // TODO every value is necessary?
     enum OutgoingBidStatus {
         None,
         Created,
@@ -26,10 +25,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         Unlocked
     }
 
-    /**
-     * @dev Status of a bid:
-     *      0 - FIXME
-     */
+    // TODO every value is necessary?
     enum IncomingBidStatus {
         None,
         Relayed,
@@ -40,30 +36,27 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     struct OutgoingBid {
         uint256 id;
         OutgoingBidStatus status;
-        uint16 fee; //FIXME it is questionable
+        uint16 fee; // FIXME the size is questionable
         address maker;
         address receiver;
         uint256 tokenId;
-        address erc721Contract;
+        address erc721Contract; // FIXME better name
         uint256 timestampOfBought;
         address buyer;
     }
 
     struct IncomingBid {
         uint256 remoteId;
-        uint256 outgoingId;
+        uint256 outgoingId; // FIXME it is not relevant on the  dst side
         IncomingBidStatus status;
         address receiver;
         uint256 tokenId;
-        address erc721Contract;
+        address erc721Contract; // FIXME better name
         uint256 timestampOfRelayed; // FIXME better name
         address relayer;
     }
 
-    /**
-     * @dev Status of a bid:
-     *      0 - FIXME
-     */
+    // TODO every value is necessary?
     enum RelayerStatus {
         None,
         Active,
@@ -75,10 +68,17 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     struct Relayer {
         RelayerStatus status;
         uint dateOfUndeposited;
-        uint256 stakedAmount; // TODO make linear relationship beetween the number of interactions and staked amount
-        // TODO use versioning
+        // TODO use versioning chain for managing bridge interactions
+        uint256 stakedAmount;
     }
 
+    // TODO every value is necessary?
+    /**
+     * @dev Status of a challenge:
+     *      0 - no challenge
+     *      1 - challenge is in progress
+     *      2 - challenge was correct/
+     */
     enum ChallengeStatus {
         None,
         Challenged,
@@ -90,24 +90,11 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         ChallengeStatus status;
     }
 
-    /**
-     * @notice FIXME
-     */
     mapping(address => Relayer) public relayers;
 
-    /**
-     * @notice FIXME
-     */
     mapping(uint256 => IncomingBid) public incomingBids;
-
-    /**
-     * @notice FIXME
-     */
     mapping(uint256 => OutgoingBid) public outgoingBids;
 
-    /**
-     * @notice FIXME
-     */
     mapping(uint256 => Challenge) public challengedIncomingBids;
 
     uint256 public immutable STAKE_AMOUNT;

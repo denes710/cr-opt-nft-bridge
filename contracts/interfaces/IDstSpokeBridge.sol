@@ -2,10 +2,6 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import {ISpokeBridge} from "./ISpokeBridge.sol";
 
-// FIXME comments
-/**
- * @notice
- */
 interface IDstSpokeBridge is ISpokeBridge {
     function createBid(
         address _receiver,

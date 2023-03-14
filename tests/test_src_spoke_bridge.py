@@ -89,6 +89,7 @@ def test_relayer_buying_bid(init_contracts):
     with reverts("SpokeBridge: caller is not a relayer!"):
         srcSpokeBridge.buyBid(0, {'from': person});
 
+    # TODO checks for balance
     srcSpokeBridge.buyBid(0, {'from': relayer});
 
     with reverts("SpokeBridge: bid does not have Created state"):
@@ -111,7 +112,7 @@ def test_relayer_relaying(init_contracts):
     srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user, 'amount': Wei("0.01 ether")})
     srcSpokeBridge.buyBid(0, {'from': relayer});
 
-    # FIXME more rever tests
+    # TODO more rever tests
     with reverts("SrcSpokeBridge: the challenging period is not expired yet!"):
         srcSpokeBridge.unlocking(0, 0, user, 1, wrappedErc721.address, {'from': relayer});
 

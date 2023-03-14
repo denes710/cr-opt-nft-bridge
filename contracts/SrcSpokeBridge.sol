@@ -9,10 +9,6 @@ import {SpokeBridge} from "./SpokeBridge.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
-// FIXME comments
-/**
- * @notice
- */
 abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
     using Counters for Counters.Counter;
 
@@ -45,6 +41,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         id.increment();
     }
 
+    // FIXME it is pretty similar to DstSpokeBridge!
     function challengeUnlocking(uint256 _bidId) public override payable {
         require(msg.value == CHALLENGE_AMOUNT, "SrcSpokeBridge: No enough amount of ETH to stake!");
         require(incomingBids[_bidId].status == IncomingBidStatus.Relayed, "SrcSpokeBridge: Corresponding incoming bid status is not relayed!");
@@ -59,7 +56,6 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
     }
 
     function sendProof(bool _isOutgoingBid, uint256 _bidId) public override {
-        // FIXME some kind of time check
         if (_isOutgoingBid) {
             OutgoingBid memory bid = outgoingBids[_bidId];
             bytes memory data = abi.encode(
@@ -84,7 +80,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                // FIXME it could be better with remote and local contract following
+                // FIXME it could be better with following remote and local contract
+                // new members?
                 bid.status == IncomingBidStatus.None ?
                     bid.erc721Contract : IContractMap(contractMap).getRemote(bid.erc721Contract),
                 bid.relayer,
@@ -103,14 +100,13 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             // On the source chain during unlocking(wrong relaying), revert the incoming messsage
             (
                 uint256 bidId,
-                OutgoingBidStatus status,
+                OutgoingBidStatus status, // FIXME maybe it is not useful
                 address receiver,
                 uint256 tokenId,
                 address localContract,
-                address relayer // FIXME challenger has to include
+                address relayer
             ) = abi.decode(bidBytes, (uint256, OutgoingBidStatus, address, uint256, address, address));
 
-            // FIXME time window check
             IncomingBid memory localChallengedBid = incomingBids[bidId];
 
             require(localChallengedBid.status != IncomingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
@@ -129,7 +125,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                     // Dealing with the challenger
                     challengedIncomingBids[bidId].status = ChallengeStatus.None;
 
-                    // FIXME: Claim can be better !!!
+                    // FIXME claim can be better, in other case as well
                     (bool isSent,) = challengedIncomingBids[bidId].challenger.call{value: CHALLENGE_AMOUNT/4}("");
                     require(isSent, "Failed to send Ether");
                 }
@@ -191,8 +187,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 //    localChallengedBid.maker, localChallengedBid.tokenId);
 
                 // Dealing with the challenger
+                // TODO claiming approach
                 (bool isSent,) = challenger.call{value: CHALLENGE_AMOUNT + STAKE_AMOUNT/3}("");
-                // FIXME it is questionable
                 require(isSent, "Failed to send Ether");
             }
         }
@@ -224,7 +220,5 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             timestampOfRelayed:block.timestamp,
             relayer:_msgSender()
         });
-
-        // FIXME missing transfer / claim / something
     }
 }

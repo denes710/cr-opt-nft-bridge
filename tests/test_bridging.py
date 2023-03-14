@@ -26,6 +26,7 @@ def init_contracts():
 
     return srcSpokeBridge, dstSpokeBridge, contractMap, erc721, wrappedErc721
 
+# FIXME add balance checks for test cases
 def test_one_token_briging_circle_without_challenge(init_contracts):
     srcSpokeBridge, dstSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
 
@@ -168,7 +169,6 @@ def test_challenge_on_dest_during_burning(init_contracts):
     # sending the proof of # id incoming message
     srcSpokeBridge.sendProof(False, 0, {'from': challenger})
 
-    # FIXME more check - relayer - challenger money
     retRelayer = dstSpokeBridge.relayers(relayer)
     assert retRelayer["status"] == 4
 

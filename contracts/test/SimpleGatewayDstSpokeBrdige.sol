@@ -5,10 +5,6 @@ import {IHub} from "../interfaces/IHub.sol";
 
 import {DstSpokeBridge} from "../DstSpokeBridge.sol";
 
-// FIXME comments
-/**
- * @notice
- */
 contract SimpleGatewayDstSpokeBrdige is DstSpokeBridge {
     constructor(address _hub) DstSpokeBridge(_hub) {
     }
