@@ -7,7 +7,6 @@ import {IWrappedERC721} from "./interfaces/IWrappedERC721.sol";
 
 import {SpokeBridge} from "./SpokeBridge.sol";
 
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
 /**
@@ -28,7 +27,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
         require(incomingBids[_incomingBidId].status == IncomingBidStatus.Relayed, "DstSpokeBridge: incoming bid is not relayed!");
         require(incomingBids[_incomingBidId].timestampOfRelayed + 4 hours < block.timestamp, "DstSpokeBridge: too early unwrapping!");
 
-        ERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
+        IWrappedERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 
         outgoingBids[id.current()] = OutgoingBid({
             id:id.current(),
