@@ -25,9 +25,9 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
         uint256 _tokenId,
         address _erc721Contract,
         uint256 _incomingBidId) public override payable {
-        require(msg.value > 0, "SrcSpokenBridge: there is no fee for relayers!");
-        require(incomingBids[_incomingBidId].status == IncomingBidStatus.Relayed, "SrcSpokenBridge: incoming bid is not relayed!");
-        require(incomingBids[_incomingBidId].timestampOfRelayed + 4 hours < block.timestamp, "SrcSpokenBridge: too early unwrapping!");
+        require(msg.value > 0, "DstSpokeBridge: there is no fee for relayers!");
+        require(incomingBids[_incomingBidId].status == IncomingBidStatus.Relayed, "DstSpokeBridge: incoming bid is not relayed!");
+        require(incomingBids[_incomingBidId].timestampOfRelayed + 4 hours < block.timestamp, "DstSpokeBridge: too early unwrapping!");
 
         ERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 

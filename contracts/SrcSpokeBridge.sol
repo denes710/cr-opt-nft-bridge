@@ -26,7 +26,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         address _receiver,
         uint256 _tokenId,
         address _erc721Contract) public override payable {
-        require(msg.value > 0, "SrcSpokenBridge: there is no fee for relayers!");
+        require(msg.value > 0, "SrcSpokeBridge: there is no fee for relayers!");
 
         ERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 

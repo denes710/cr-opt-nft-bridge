@@ -133,32 +133,32 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     modifier onlyActiveRelayer() {
-        require(RelayerStatus.Active == relayers[_msgSender()].status, "SpokenBridge: caller is not a relayer!");
+        require(RelayerStatus.Active == relayers[_msgSender()].status, "SpokeBridge: caller is not a relayer!");
         _;
     }
 
     modifier onlyUndepositedRelayer() {
         require(RelayerStatus.Undeposited == relayers[_msgSender()].status,
-            "SpokenBridge: caller is not in undeposited state!");
+            "SpokeBridge: caller is not in undeposited state!");
         _;
     }
 
     modifier onlyHub() {
-        require(_getCrossMessageSender() == HUB, "SpokenBridge: caller is not the hub!");
+        require(_getCrossMessageSender() == HUB, "SpokeBridge: caller is not the hub!");
         _;
     }
 
     function buyBid(uint256 _bidId) public virtual override onlyActiveRelayer() {
         require(outgoingBids[_bidId].status == OutgoingBidStatus.Created,
-            "SpokenBridge: bid does not have Created state");
+            "SpokeBridge: bid does not have Created state");
         outgoingBids[_bidId].status = OutgoingBidStatus.Bought;
         outgoingBids[_bidId].buyer = _msgSender();
         outgoingBids[_bidId].timestampOfBought = block.timestamp;
     }
 
     function deposite() public override payable {
-        require(RelayerStatus.None == relayers[_msgSender()].status, "SpokenBridge: caller cannot be a relayer!");
-        require(msg.value == STAKE_AMOUNT, "SpokenBridge: msg.value is not appropriate!");
+        require(RelayerStatus.None == relayers[_msgSender()].status, "SpokeBridge: caller cannot be a relayer!");
+        require(msg.value == STAKE_AMOUNT, "SpokeBridge: msg.value is not appropriate!");
 
         relayers[_msgSender()].status = RelayerStatus.Active;
         relayers[_msgSender()].stakedAmount = msg.value;
@@ -171,7 +171,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     function claimDeposite() public override onlyUndepositedRelayer {
         require(block.timestamp > relayers[_msgSender()].dateOfUndeposited + TIME_LIMIT_OF_UNDEPOSIT,
-            "SpokenBridge: 2 days is not expired from the undepositing!");
+            "SpokeBridge: 2 days is not expired from the undepositing!");
 
         (bool isSent,) = _msgSender().call{value: STAKE_AMOUNT}("");
         require(isSent, "Failed to send Ether");
