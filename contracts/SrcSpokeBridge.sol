@@ -189,7 +189,6 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         });
     }
 
-    // FIXME add test cases
     function claimNFT(uint256 _incomingBidId) external {
         IncomingBid memory bid = incomingBids[_incomingBidId];
 
