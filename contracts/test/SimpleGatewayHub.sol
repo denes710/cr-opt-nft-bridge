@@ -17,7 +17,7 @@ contract SimpleGatewayHub is IHub, Ownable {
     mapping(address => address) public bridgeToBrdige;
 
     function processMessage(bytes memory _data) public override {
-        require(bridgeToBrdige[_msgSender()] == address(0), "Hub: contract has no pair!");
+        require(bridgeToBrdige[_msgSender()] != address(0), "Hub: contract has no pair!");
 
         ISpokeBridge(bridgeToBrdige[_msgSender()]).receiveProof(_data);
     }

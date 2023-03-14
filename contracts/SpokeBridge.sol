@@ -158,7 +158,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     function deposite() public override payable {
         require(RelayerStatus.None == relayers[_msgSender()].status, "SpokenBridge: caller cannot be a relayer!");
-        require(msg.value == STAKE_AMOUNT);
+        require(msg.value == STAKE_AMOUNT, "SpokenBridge: msg.value is not appropriate!");
 
         relayers[_msgSender()].status = RelayerStatus.Active;
         relayers[_msgSender()].stakedAmount = msg.value;

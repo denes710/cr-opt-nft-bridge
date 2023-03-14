@@ -195,10 +195,12 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         uint256 _tokenId,
         address _remoteErc721Contract
     )  public override onlyActiveRelayer {
-        require(outgoingBids[_lockingBidId].status == OutgoingBidStatus.Bought);
-        require(incomingBids[_bidId].status == IncomingBidStatus.None);
+        require(outgoingBids[_lockingBidId].status == OutgoingBidStatus.Bought, "SrcSpokeBridge: the outgoing bid is not bought!");
+        require(incomingBids[_bidId].status == IncomingBidStatus.None, "SrcSpokeBridge: there is an incoming bid with the same id!");
+        require(outgoingBids[_lockingBidId].timestampOfBought + 4 hours < block.timestamp,
+            "SrcSpokeBridge: the challenging period is not expired yet!");
         address localErc721Contract = IContractMap(contractMap).getLocal(_remoteErc721Contract);
-        require(ERC721(localErc721Contract).ownerOf(_tokenId) == address(this));
+        require(ERC721(localErc721Contract).ownerOf(_tokenId) == address(this),  "SrcSpokeBridge: there is no locked token!");
 
         outgoingBids[_lockingBidId].status = OutgoingBidStatus.Unlocked;
 
