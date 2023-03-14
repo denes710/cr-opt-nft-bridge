@@ -52,9 +52,9 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
     }
 
     function challengeMinting(uint256 _bidId) public override payable {
-        require(msg.value == CHALLENGE_AMOUNT);
-        require(incomingBids[_bidId].status == IncomingBidStatus.Relayed);
-        require(incomingBids[_bidId].timestampOfRelayed + 4 hours > block.timestamp);
+        require(msg.value == CHALLENGE_AMOUNT, "DstSpokeBridge: No enough amount of ETH to stake!");
+        require(incomingBids[_bidId].status == IncomingBidStatus.Relayed, "DstSpokeBridge: Corresponding incoming bid status is not relayed!");
+        require(incomingBids[_bidId].timestampOfRelayed + 4 hours > block.timestamp, "DstSpokeBridge: The dispute period is expired!");
 
         incomingBids[_bidId].status = IncomingBidStatus.Challenged;
 
