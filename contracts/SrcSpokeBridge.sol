@@ -221,4 +221,18 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             relayer:_msgSender()
         });
     }
+
+    // FIXME add test cases
+    function claimNFT(uint256 _incomingBidId) external {
+        IncomingBid memory bid = incomingBids[_incomingBidId];
+
+        require(bid.status == IncomingBidStatus.Relayed,
+            "SrcSpokeBride: incoming bid has no Relayed state!");
+        require(bid.timestampOfRelayed + 4 hours < block.timestamp,
+            "SrcSpokeBridge: the challenging period is not expired yet!");
+        require(bid.receiver == _msgSender(), "SrcSpokeBridge: claimer is not the owner!");
+
+        bid.status = IncomingBidStatus.Unlocked;
+        ERC721(bid.erc721Contract).safeTransferFrom(address(this), _msgSender(), bid.tokenId);
+    }
 }

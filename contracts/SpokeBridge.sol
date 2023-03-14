@@ -28,7 +28,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         None,
         Relayed,
         Challenged,
-        Malicious
+        Malicious,
+        Unlocked
     }
 
     struct OutgoingBid {

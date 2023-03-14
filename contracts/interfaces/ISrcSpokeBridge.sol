@@ -15,5 +15,5 @@ interface ISrcSpokeBridge is ISpokeBridge {
         uint256 _tokenId,
         address _originErc721Contract) external;
 
-    // TODO claim function, only on src side?
+    function claimNFT(uint256 _bidId) external;
 }
