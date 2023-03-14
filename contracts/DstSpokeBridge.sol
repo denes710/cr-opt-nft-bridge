@@ -37,7 +37,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             maker:_msgSender(),
             receiver:_receiver,
             tokenId:_tokenId,
-            erc721Contract:_erc721Contract,
+            remoteErc721Contract:_erc721Contract,
             timestampOfBought:0,
             buyer:address(0)
         });
@@ -47,7 +47,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
 
     function buyBid(uint256 _bidId) public override(ISpokeBridge, SpokeBridge) onlyActiveRelayer() {
         super.buyBid(_bidId);
-        IWrappedERC721(outgoingBids[_bidId].erc721Contract).burn(outgoingBids[_bidId].tokenId);
+        IWrappedERC721(outgoingBids[_bidId].remoteErc721Contract).burn(outgoingBids[_bidId].tokenId);
     }
 
     function challengeMinting(uint256 _bidId) public override payable {
@@ -62,7 +62,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                bid.erc721Contract,
+                bid.remoteErc721Contract,
                 bid.buyer
             );
 
@@ -164,7 +164,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             if (status == IncomingBidStatus.Relayed &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
-                localChallengedBid.erc721Contract == localContract &&
+                localChallengedBid.remoteErc721Contract == localContract &&
                 localChallengedBid.buyer == relayer
             ) {
                 // False challenging
@@ -175,7 +175,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
                 // Burning the wrong minted token
-                IWrappedERC721(localChallengedBid.erc721Contract).mint(
+                IWrappedERC721(localChallengedBid.remoteErc721Contract).mint(
                     localChallengedBid.maker, localChallengedBid.tokenId);
 
                 // Dealing with the challenger

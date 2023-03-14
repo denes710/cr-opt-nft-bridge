@@ -39,7 +39,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         address maker;
         address receiver;
         uint256 tokenId;
-        address erc721Contract; // FIXME better name
+        // it is always an address on the dst chain
+        address remoteErc721Contract;
         uint256 timestampOfBought;
         address buyer;
     }

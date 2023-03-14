@@ -33,7 +33,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             maker:_msgSender(),
             receiver:_receiver,
             tokenId:_tokenId,
-            erc721Contract:_erc721Contract,
+            remoteErc721Contract:_erc721Contract,
             timestampOfBought:0,
             buyer:address(0)
         });
@@ -53,7 +53,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                bid.erc721Contract,
+                bid.remoteErc721Contract,
                 bid.buyer
             );
 
@@ -159,7 +159,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             if (status != IncomingBidStatus.Malicious &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
-                IContractMap(contractMap).getRemote(localChallengedBid.erc721Contract) == remoteContract &&
+                IContractMap(contractMap).getRemote(localChallengedBid.remoteErc721Contract) == remoteContract &&
                 localChallengedBid.buyer == relayer
             ) {
                 // False challenging
