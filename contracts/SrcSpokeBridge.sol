@@ -58,7 +58,6 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         relayers[incomingBids[_bidId].relayer].status = RelayerStatus.Challenged;
     }
 
-
     function sendProof(bool _isOutgoingBid, uint256 _bidId) public override {
         // FIXME some kind of time check
         if (_isOutgoingBid) {
@@ -85,8 +84,11 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                bid.erc721Contract,
-                bid.relayer
+                // FIXME it could be better with remote and local contract following
+                bid.status == IncomingBidStatus.None ?
+                    bid.erc721Contract : IContractMap(contractMap).getRemote(bid.erc721Contract),
+                bid.relayer,
+                _msgSender()
             );
 
             data = abi.encode(data, false);
@@ -105,14 +107,16 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 address receiver,
                 uint256 tokenId,
                 address localContract,
-                address relayer
+                address relayer // FIXME challenger has to include
             ) = abi.decode(bidBytes, (uint256, OutgoingBidStatus, address, uint256, address, address));
 
             // FIXME time window check
             IncomingBid memory localChallengedBid = incomingBids[bidId];
 
-            if (!_isIncomingBidStatusChallangable(localChallengedBid) &&
-                status == OutgoingBidStatus.Bought &&
+            require(localChallengedBid.status != IncomingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
+            require(localChallengedBid.timestampOfRelayed + 4 hours > block.timestamp, "SrcSpokeBridge: Time window is expired!");
+
+            if (status == OutgoingBidStatus.Bought &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.erc721Contract == localContract &&
@@ -121,13 +125,14 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 localChallengedBid.status = IncomingBidStatus.Relayed;
                 relayers[localChallengedBid.relayer].status = RelayerStatus.Active;
 
-                // Dealing with the challenger
-                challengedIncomingBids[bidId].status = ChallengeStatus.None;
+                if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
+                    // Dealing with the challenger
+                    challengedIncomingBids[bidId].status = ChallengeStatus.None;
 
-                // FIXME: Claim can be better !!!
-                (bool isSent,) = challengedIncomingBids[bidId].challenger.call{value: CHALLENGE_AMOUNT/4}("");
-                require(isSent, "Failed to send Ether");
-
+                    // FIXME: Claim can be better !!!
+                    (bool isSent,) = challengedIncomingBids[bidId].challenger.call{value: CHALLENGE_AMOUNT/4}("");
+                    require(isSent, "Failed to send Ether");
+                }
             } else {
                 // Proved malicious bid(behavior)
                 localChallengedBid.status = IncomingBidStatus.Malicious;
@@ -139,42 +144,41 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 // FIXME do something with lockedId
 
                 // Dealing with the challenger
+                if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
+
+                    (bool isSent,) = challengedIncomingBids[bidId].challenger.call{
+                        value: CHALLENGE_AMOUNT + STAKE_AMOUNT/3}("");
+
+                    require(isSent, "Failed to send Ether");
+                }
                 challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
-
-                (bool isSent,) = challengedIncomingBids[bidId].challenger.call{
-                    value: CHALLENGE_AMOUNT + STAKE_AMOUNT/3}("");
-
-                require(isSent, "Failed to send Ether");
             }
         } else {
             // On the source chain during locking(no relaying), revert locking
             (
                 uint256 bidId,
-                IncomingBidStatus status,
+                IncomingBidStatus status, // FIXME maybe not useful
                 address receiver,
                 uint256 tokenId,
-                address localContract,
-                address relayer
-            ) = abi.decode(bidBytes, (uint256, IncomingBidStatus, address, uint256, address, address));
+                address remoteContract,
+                address relayer,
+                address challenger
+            ) = abi.decode(bidBytes, (uint256, IncomingBidStatus, address, uint256, address, address, address));
 
             OutgoingBid memory localChallengedBid = outgoingBids[bidId];
 
-            if (!_isOutgoingBidStatusChallangable(localChallengedBid) &&
-                status == IncomingBidStatus.Relayed &&
+            require(localChallengedBid.status != OutgoingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
+            require(localChallengedBid.timestampOfBought + 4 hours < block.timestamp, "SrcSpokeBridge: Time window is not expired!");
+
+            if (status != IncomingBidStatus.Malicious &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
-                localChallengedBid.erc721Contract == localContract &&
-                localChallengedBid.buyer == relayer) {
-
+                IContractMap(contractMap).getRemote(localChallengedBid.erc721Contract) == remoteContract &&
+                localChallengedBid.buyer == relayer
+            ) {
                 // False challenging
-                localChallengedBid.status = OutgoingBidStatus.Bought;
-                relayers[localChallengedBid.buyer].status = RelayerStatus.Active;
+                require(false, "SrcSpokeBridge: False challenging!");
 
-                // Dealing with the challenger
-                challengedIncomingBids[bidId].status = ChallengeStatus.None;
-
-                (bool isSent,) = challengedIncomingBids[bidId].challenger.call{value: CHALLENGE_AMOUNT/4}("");
-                require(isSent, "Failed to send Ether");
             } else {
                 // Proved malicious bid(behavior)
                 // localChallengedBid data is not corresponding to the bid
@@ -187,11 +191,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 //    localChallengedBid.maker, localChallengedBid.tokenId);
 
                 // Dealing with the challenger
-                challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
-
-                (bool isSent,) = challengedIncomingBids[bidId].challenger.call{
-                    value: CHALLENGE_AMOUNT + STAKE_AMOUNT/3}("");
-
+                (bool isSent,) = challenger.call{value: CHALLENGE_AMOUNT + STAKE_AMOUNT/3}("");
+                // FIXME it is questionable
                 require(isSent, "Failed to send Ether");
             }
         }

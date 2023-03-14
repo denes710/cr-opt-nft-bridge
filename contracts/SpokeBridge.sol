@@ -110,11 +110,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
      */
     mapping(uint256 => Challenge) public challengedIncomingBids;
 
-    /**
-     * @notice FIXME
-     */
-    mapping(uint256 => Challenge) public challengedOutgoingBids;
-
     uint256 public immutable STAKE_AMOUNT;
 
     uint256 public immutable CHALLENGE_AMOUNT;
@@ -182,14 +177,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function _sendMessage(bytes memory _data) internal virtual;
 
     function _getCrossMessageSender() internal virtual returns (address);
-
-    function _isOutgoingBidStatusChallangable(OutgoingBid memory _bid) internal returns (bool) {
-        return _bid.status == OutgoingBidStatus.Bought ||_bid.status == OutgoingBidStatus.Challenged;
-    }
-
-    function _isIncomingBidStatusChallangable(IncomingBid memory _bid) internal virtual returns (bool) {
-        return _bid.status == IncomingBidStatus.Relayed || _bid.status == IncomingBidStatus.Challenged;
-    }
 
     /**
      * Always returns `IERC721Receiver.onERC721Received.selector`.
