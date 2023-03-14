@@ -76,6 +76,9 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
             _sendMessage(data);
         } else {
+            require(incomingBids[_bidId].timestampOfRelayed + 4 hours < block.timestamp,
+                "SrcSpokeBridge: too early to send proof!");
+
             IncomingBid memory bid = incomingBids[_bidId];
             bytes memory data = abi.encode(
                 _bidId,

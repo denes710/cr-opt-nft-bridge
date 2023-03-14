@@ -65,7 +65,6 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
     }
 
     function sendProof(bool _isOutgoingBid, uint256 _bidId) public override {
-        // FIXME some kind of time check
         if (_isOutgoingBid) {
             OutgoingBid memory bid = outgoingBids[_bidId];
             bytes memory data = abi.encode(
@@ -81,6 +80,9 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
 
             _sendMessage(data);
         } else {
+            require(incomingBids[_bidId].timestampOfRelayed + 4 hours < block.timestamp,
+                "DstSpokeBridge: too early to send proof!");
+
             IncomingBid memory bid = incomingBids[_bidId];
             bytes memory data = abi.encode(
                 _bidId,
