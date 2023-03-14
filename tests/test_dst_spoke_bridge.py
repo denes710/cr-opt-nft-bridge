@@ -69,7 +69,6 @@ def test_relayer_relaying(init_contracts):
     assert retBid["tokenId"] == 1
     assert retBid["remoteErc721Contract"] == wrappedErc721.address
     assert retBid["receiver"] == receiver
-    assert retBid["remoteId"] == 0
     assert retBid["relayer"] == relayer
 
     assert wrappedErc721.ownerOf(1) == receiver

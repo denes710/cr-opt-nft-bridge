@@ -33,7 +33,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     struct OutgoingBid {
-        uint256 id;
         OutgoingBidStatus status;
         uint256 fee;
         address maker;
@@ -46,7 +45,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     struct IncomingBid {
-        uint256 remoteId;
         uint256 outgoingId; // FIXME it is not relevant on the dst side
         IncomingBidStatus status;
         address receiver;

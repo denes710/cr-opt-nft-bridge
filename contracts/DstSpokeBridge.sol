@@ -30,7 +30,6 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
         IWrappedERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 
         outgoingBids[id.current()] = OutgoingBid({
-            id:id.current(),
             status:OutgoingBidStatus.Created,
             fee:uint16(msg.value),
             maker:_msgSender(),
@@ -197,7 +196,6 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
         IWrappedERC721(_erc721Contract).mint(_to, _tokenId);
 
         incomingBids[_bidId] = IncomingBid({
-            remoteId:_bidId,
             outgoingId:0,
             status:IncomingBidStatus.Relayed,
             receiver:_to,

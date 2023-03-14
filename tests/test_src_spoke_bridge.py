@@ -128,5 +128,4 @@ def test_relayer_relaying(init_contracts):
     assert retBid["tokenId"] == 1
     assert retBid["remoteErc721Contract"] == contractMap.getLocal(wrappedErc721.address)
     assert retBid["receiver"] == user
-    assert retBid["remoteId"] == 0
     assert retBid["relayer"] == relayer

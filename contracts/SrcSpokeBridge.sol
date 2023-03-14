@@ -27,7 +27,6 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         IERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 
         outgoingBids[id.current()] = OutgoingBid({
-            id:id.current(),
             status:OutgoingBidStatus.Created,
             fee:uint16(msg.value),
             maker:_msgSender(),
@@ -192,7 +191,6 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         outgoingBids[_lockingBidId].status = OutgoingBidStatus.Unlocked;
 
         incomingBids[_bidId] = IncomingBid({
-            remoteId:_bidId,
             outgoingId:_lockingBidId,
             status:IncomingBidStatus.Relayed,
             receiver:_to,
