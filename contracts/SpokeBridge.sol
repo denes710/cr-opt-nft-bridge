@@ -13,23 +13,21 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
 
-    // TODO every value is necessary?
     enum OutgoingBidStatus {
         None,
         Created,
         Bought,
         Challenged,
         Malicious,
-        Unlocked
+        Unlocked // FIXME it is used only on src
     }
 
-    // TODO every value is necessary?
     enum IncomingBidStatus {
         None,
         Relayed,
         Challenged,
         Malicious,
-        Unlocked
+        Unlocked // FIXME it is used only on src
     }
 
     struct OutgoingBid {
@@ -58,7 +56,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         address relayer;
     }
 
-    // TODO every value is necessary?
     enum RelayerStatus {
         None,
         Active,
@@ -74,7 +71,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         uint256 stakedAmount;
     }
 
-    // TODO every value is necessary?
     /**
      * @dev Status of a challenge:
      *      0 - no challenge
@@ -210,6 +206,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");
         require(incomingBids[_bidId].status == IncomingBidStatus.Relayed, "SpokeBridge: Corresponding incoming bid status is not relayed!");
         require(incomingBids[_bidId].timestampOfRelayed + 4 hours > block.timestamp, "SpokeBridge: The dispute period is expired!");
+        require(challengedIncomingBids[_bidId].status == ChallengeStatus.None, "SpokeBridge: bid is already challenged!");
 
         incomingBids[_bidId].status = IncomingBidStatus.Challenged;
 

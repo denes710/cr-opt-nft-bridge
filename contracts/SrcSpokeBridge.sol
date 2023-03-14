@@ -150,7 +150,6 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
             } else {
                 // Proved malicious bid - no relaying
-                // localChallengedBid data is not corresponding to the bid
                 localChallengedBid.status = OutgoingBidStatus.Malicious;
                 relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
@@ -162,6 +161,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                     outgoingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
                     outgoingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 3;
                 }
+
+                challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
             }
         }
     }

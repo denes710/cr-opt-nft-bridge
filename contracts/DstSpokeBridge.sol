@@ -170,6 +170,8 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                     outgoingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
                     outgoingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 3;
                 }
+
+                challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
             }
         }
     }
