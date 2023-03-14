@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+
 // FIXME comments
 /**
  * @notice This interface will send and receive messages through.
  */
-interface ISpokeBridge {
+interface ISpokeBridge is IERC721Receiver {
     // TODO define the parameters of the BID
     event BidCreated();
 

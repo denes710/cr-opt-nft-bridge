@@ -182,4 +182,11 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function _sendMessage(bytes memory _data) internal virtual;
 
     function _getCrossMessageSender() internal virtual returns (address);
+
+    /**
+     * Always returns `IERC721Receiver.onERC721Received.selector`.
+     */
+    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
 }
