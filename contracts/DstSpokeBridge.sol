@@ -173,7 +173,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 localChallengedBid.status = OutgoingBidStatus.Malicious;
                 relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
-                // Burning the wrong minted token
+                // Minting the wrong burned token
                 IWrappedERC721(localChallengedBid.localErc721Contract).mint(
                     localChallengedBid.maker, localChallengedBid.tokenId);
 

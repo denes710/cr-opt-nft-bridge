@@ -166,11 +166,11 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
                 IERC721(localChallengedBid.localErc721Contract)
-                    .safeTransferFrom(address(this), _msgSender(), localChallengedBid.tokenId);
+                    .safeTransferFrom(address(this), localChallengedBid.maker, localChallengedBid.tokenId);
 
                 // Dealing with the challenger
                 // TODO claiming approach
-                (bool isSent,) = challenger.call{value: CHALLENGE_AMOUNT + STAKE_AMOUNT/3}("");
+                (bool isSent,) = challenger.call{value: STAKE_AMOUNT/3}("");
                 require(isSent, "Failed to send Ether");
             }
         }
