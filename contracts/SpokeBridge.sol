@@ -13,8 +13,6 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
 
-
-
     // TODO every value is necessary?
     enum OutgoingBidStatus {
         None,
@@ -36,7 +34,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     struct OutgoingBid {
         uint256 id;
         OutgoingBidStatus status;
-        uint16 fee; // FIXME the size is questionable
+        uint256 fee;
         address maker;
         address receiver;
         uint256 tokenId;
