@@ -71,7 +71,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                outgoingBids[bid.remoteId].remoteErc721Contract,
+                outgoingBids[bid.outgoingId].remoteErc721Contract,
                 bid.relayer,
                 _msgSender()
             );
@@ -122,10 +122,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 localChallengedBid.status = IncomingBidStatus.Malicious;
                 relayers[localChallengedBid.relayer].status = RelayerStatus.Malicious;
 
-                // Burning the wrong minted token - it is not possible to claim from the incoming
-                // IWrappedERC721(localChallengedBid.localContract).burn(localChallengedBid.tokenId);
-
-                // FIXME do something with lockedId
+                outgoingBids[localChallengedBid.outgoingId].status = OutgoingBidStatus.Bought;
 
                 // Dealing with the challenger
                 if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
@@ -164,15 +161,13 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 require(false, "SrcSpokeBridge: False challenging!");
 
             } else {
-                // Proved malicious bid(behavior)
+                // Proved malicious bid - no relaying
                 // localChallengedBid data is not corresponding to the bid
                 localChallengedBid.status = OutgoingBidStatus.Malicious;
                 relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
-                // FIXME unlock NFT
-                // Burning the wrong minted token
-                // IWrappedERC721(localChallengedBid.localContract).mint(
-                //    localChallengedBid.maker, localChallengedBid.tokenId);
+                IERC721(localChallengedBid.localErc721Contract)
+                    .safeTransferFrom(address(this), _msgSender(), localChallengedBid.tokenId);
 
                 // Dealing with the challenger
                 // TODO claiming approach
@@ -219,7 +214,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         require(bid.receiver == _msgSender(), "SrcSpokeBridge: claimer is not the owner!");
 
         bid.status = IncomingBidStatus.Unlocked;
-        IERC721(outgoingBids[incomingBids[_incomingBidId].remoteId].localErc721Contract)
+        IERC721(outgoingBids[incomingBids[_incomingBidId].outgoingId].localErc721Contract)
             .safeTransferFrom(address(this), _msgSender(), bid.tokenId);
     }
 }
