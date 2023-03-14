@@ -306,7 +306,7 @@ def test_false_challenge_on_source_during_unlocking(init_contracts):
     dstSpokeBridge.buyBid(0, {'from': relayer})
 
     # false challenging before relaying
-    with reverts("SrcSpokeBridge: Corresponding incoming bid status is not relayed!"):
+    with reverts("SpokeBridge: Corresponding incoming bid status is not relayed!"):
         srcSpokeBridge.challengeUnlocking(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("SrcSpokeBrdige: There is no corresponding local bid!"):
         dstSpokeBridge.sendProof(True, 0, {'from': challenger})
@@ -319,7 +319,7 @@ def test_false_challenge_on_source_during_unlocking(init_contracts):
     chain.sleep(14400000) # it's 4 hours
 
     # challenging after time window
-    with reverts("SrcSpokeBridge: The dispute period is expired!"):
+    with reverts("SpokeBridge: The dispute period is expired!"):
         srcSpokeBridge.challengeUnlocking(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("SrcSpokeBridge: Time window is expired!"):
         dstSpokeBridge.sendProof(True, 0, {'from': challenger})
@@ -350,7 +350,7 @@ def test_false_challenge_on_source_during_unlocking_wrong_proof(init_contracts):
     dstSpokeBridge.buyBid(0, {'from': relayer})
 
     # false challenging before relaying
-    with reverts("SrcSpokeBridge: Corresponding incoming bid status is not relayed!"):
+    with reverts("SpokeBridge: Corresponding incoming bid status is not relayed!"):
         srcSpokeBridge.challengeUnlocking(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("SrcSpokeBridge: False challenging!"):
         dstSpokeBridge.sendProof(False, 0, {'from': challenger})
@@ -363,7 +363,7 @@ def test_false_challenge_on_source_during_unlocking_wrong_proof(init_contracts):
     chain.sleep(14400000) # it's 4 hours
 
     # challenging after time window
-    with reverts("SrcSpokeBridge: The dispute period is expired!"):
+    with reverts("SpokeBridge: The dispute period is expired!"):
         srcSpokeBridge.challengeUnlocking(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("SrcSpokeBridge: False challenging!"):
         dstSpokeBridge.sendProof(False, 0, {'from': challenger})
@@ -405,7 +405,7 @@ def test_false_challenge_on_dest_during_minting(init_contracts):
     srcSpokeBridge.buyBid(0, {'from': relayer})
 
     # challenging
-    with reverts("DstSpokeBridge: Corresponding incoming bid status is not relayed!"):
+    with reverts("SpokeBridge: Corresponding incoming bid status is not relayed!"):
         dstSpokeBridge.challengeMinting(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("DstSpokeBrdige: There is no corresponding local bid!"):
         srcSpokeBridge.sendProof(True, 0, {'from': challenger})
@@ -418,7 +418,7 @@ def test_false_challenge_on_dest_during_minting(init_contracts):
     chain.sleep(14400000) # it's 4 hours
 
     # challenging
-    with reverts("DstSpokeBridge: The dispute period is expired!"):
+    with reverts("SpokeBridge: The dispute period is expired!"):
         dstSpokeBridge.challengeMinting(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("DstSpokeBridge: Time window is expired!"):
         srcSpokeBridge.sendProof(True, 0, {'from': challenger})
@@ -440,7 +440,7 @@ def test_challenge_on_dest_during_minting_wrong_proof(init_contracts):
     srcSpokeBridge.buyBid(0, {'from': relayer})
 
     # challenging
-    with reverts("DstSpokeBridge: Corresponding incoming bid status is not relayed!"):
+    with reverts("SpokeBridge: Corresponding incoming bid status is not relayed!"):
         dstSpokeBridge.challengeMinting(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("DstSpokeBrdige: There is no corresponding local bid!"):
         srcSpokeBridge.sendProof(False, 0, {'from': challenger})
@@ -453,7 +453,7 @@ def test_challenge_on_dest_during_minting_wrong_proof(init_contracts):
     chain.sleep(14400000) # it's 4 hours
 
     # challenging
-    with reverts("DstSpokeBridge: The dispute period is expired!"):
+    with reverts("SpokeBridge: The dispute period is expired!"):
         dstSpokeBridge.challengeMinting(0, {'from': challenger, 'amount': Wei("10 ether")});
     with reverts("DstSpokeBrdige: There is no corresponding local bid!"):
         srcSpokeBridge.sendProof(False, 0, {'from': challenger})

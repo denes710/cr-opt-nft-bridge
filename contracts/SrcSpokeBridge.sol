@@ -41,18 +41,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         id.increment();
     }
 
-    // FIXME it is pretty similar to DstSpokeBridge!
     function challengeUnlocking(uint256 _bidId) public override payable {
-        require(msg.value == CHALLENGE_AMOUNT, "SrcSpokeBridge: No enough amount of ETH to stake!");
-        require(incomingBids[_bidId].status == IncomingBidStatus.Relayed, "SrcSpokeBridge: Corresponding incoming bid status is not relayed!");
-        require(incomingBids[_bidId].timestampOfRelayed + 4 hours > block.timestamp, "SrcSpokeBridge: The dispute period is expired!");
-
-        incomingBids[_bidId].status = IncomingBidStatus.Challenged;
-
-        challengedIncomingBids[_bidId].challenger = _msgSender();
-        challengedIncomingBids[_bidId].status = ChallengeStatus.Challenged;
-
-        relayers[incomingBids[_bidId].relayer].status = RelayerStatus.Challenged;
+        super._challengeUnlocking(_bidId);
     }
 
     function sendProof(bool _isOutgoingBid, uint256 _bidId) public override {

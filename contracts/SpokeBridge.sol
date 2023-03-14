@@ -170,4 +170,17 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
         return this.onERC721Received.selector;
     }
+
+    function _challengeUnlocking(uint256 _bidId) internal {
+        require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");
+        require(incomingBids[_bidId].status == IncomingBidStatus.Relayed, "SpokeBridge: Corresponding incoming bid status is not relayed!");
+        require(incomingBids[_bidId].timestampOfRelayed + 4 hours > block.timestamp, "SpokeBridge: The dispute period is expired!");
+
+        incomingBids[_bidId].status = IncomingBidStatus.Challenged;
+
+        challengedIncomingBids[_bidId].challenger = _msgSender();
+        challengedIncomingBids[_bidId].status = ChallengeStatus.Challenged;
+
+        relayers[incomingBids[_bidId].relayer].status = RelayerStatus.Challenged;
+    }
 }
