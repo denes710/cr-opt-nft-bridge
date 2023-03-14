@@ -143,6 +143,9 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         outgoingBids[_bidId].status = OutgoingBidStatus.Bought;
         outgoingBids[_bidId].buyer = _msgSender();
         outgoingBids[_bidId].timestampOfBought = block.timestamp;
+
+        (bool isSent,) = _msgSender().call{value: outgoingBids[_bidId].fee}("");
+        require(isSent, "Failed to send Ether");
     }
 
     function deposite() public override payable {
@@ -168,7 +171,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         relayers[_msgSender()].status = RelayerStatus.None;
     }
 
-    // FIXME add test cases
     function claimChallengeReward(uint256 _challengeId, bool _isOutgoingBid) public override {
         if (_isOutgoingBid) {
             require(!outgoingChallengeRewards[_challengeId].isClaimed, "SpokeBridge: reward is already claimed!");

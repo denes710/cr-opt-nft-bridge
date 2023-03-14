@@ -28,7 +28,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
         outgoingBids[id.current()] = OutgoingBid({
             status:OutgoingBidStatus.Created,
-            fee:uint16(msg.value),
+            fee:msg.value,
             maker:_msgSender(),
             receiver:_receiver,
             tokenId:_tokenId,
@@ -118,7 +118,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 // Dealing with the challenger
                 if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
                     incomingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
-                    incomingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 3;
+                    incomingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 4;
                 }
                 challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
             }
@@ -156,11 +156,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 IERC721(localChallengedBid.localErc721Contract)
                     .safeTransferFrom(address(this), localChallengedBid.maker, localChallengedBid.tokenId);
 
-                // Dealing with the challenger
-                if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
-                    outgoingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
-                    outgoingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 3;
-                }
+                outgoingChallengeRewards[bidId].challenger = challenger;
+                outgoingChallengeRewards[bidId].amount = STAKE_AMOUNT / 4;
 
                 challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
             }
