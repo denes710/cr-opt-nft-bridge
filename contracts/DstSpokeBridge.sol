@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
-import {IContractMap} from "./interfaces/IContractMap.sol";
 import {ISpokeBridge} from "./interfaces/ISpokeBridge.sol";
 import {IDstSpokeBridge} from "./interfaces/IDstSpokeBridge.sol";
 import {IWrappedERC721} from "./interfaces/IWrappedERC721.sol";
@@ -18,7 +17,7 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
     using Counters for Counters.Counter;
 
-    constructor(address _contractMap, address _hub) SpokeBridge(_contractMap, _hub) {
+    constructor(address _hub) SpokeBridge(_hub) {
     }
 
     function createBid(

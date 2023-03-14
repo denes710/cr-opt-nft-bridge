@@ -123,12 +123,9 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     Counters.Counter public id;
 
-    address public contractMap;
-
     address public immutable HUB;
 
-    constructor(address _contractMap, address _hub) {
-        contractMap = _contractMap;
+    constructor(address _hub) {
         HUB = _hub;
         STAKE_AMOUNT = 20 ether;
         CHALLENGE_AMOUNT = 10 ether;

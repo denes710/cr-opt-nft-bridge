@@ -16,7 +16,10 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
     using Counters for Counters.Counter;
 
-    constructor(address _contractMap, address _hub) SpokeBridge(_contractMap, _hub) {
+    address public contractMap;
+
+    constructor(address _contractMap, address _hub) SpokeBridge(_hub) {
+        contractMap = _contractMap;
     }
 
     function createBid(
