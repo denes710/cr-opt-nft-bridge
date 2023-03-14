@@ -131,7 +131,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             } else {
                 // Proved malicious bid(behavior)
                 localChallengedBid.status = IncomingBidStatus.Malicious;
-                relayers[relayer].status = RelayerStatus.Malicious;
+                relayers[localChallengedBid.relayer].status = RelayerStatus.Malicious;
 
                 // Burning the wrong minted token - it is not possible to claim from the incoming
                 // IWrappedERC721(localChallengedBid.localContract).burn(localChallengedBid.tokenId);
@@ -168,7 +168,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
                 // False challenging
                 localChallengedBid.status = OutgoingBidStatus.Bought;
-                relayers[relayer].status = RelayerStatus.Active;
+                relayers[localChallengedBid.buyer].status = RelayerStatus.Active;
 
                 // Dealing with the challenger
                 challengedIncomingBids[bidId].status = ChallengeStatus.None;

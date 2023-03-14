@@ -123,7 +123,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 localChallengedBid.relayer == relayer) {
                 // False challenging
                 localChallengedBid.status = IncomingBidStatus.Relayed;
-                relayers[relayer].status = RelayerStatus.Active;
+                relayers[localChallengedBid.relayer].status = RelayerStatus.Active;
 
                 // Dealing with the challenger
                 challengedIncomingBids[bidId].status = ChallengeStatus.None;
