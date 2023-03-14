@@ -8,12 +8,7 @@ interface ISrcSpokeBridge is ISpokeBridge {
 
     function challengeUnlocking(uint256 _bidId) external payable;
 
-    function unlocking(
-        uint256 _lockingBidId,
-        uint256 _bidId,
-        address _to,
-        uint256 _tokenId,
-        address _originErc721Contract) external;
+    function unlocking(uint256 _lockingBidId, uint256 _bidId, address _to) external;
 
     function claimNFT(uint256 _bidId) external;
 }

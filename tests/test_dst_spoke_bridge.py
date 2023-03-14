@@ -67,7 +67,7 @@ def test_relayer_relaying(init_contracts):
     retBid = dstSpokeBridge.incomingBids(0)
     assert retBid["status"] == 1
     assert retBid["tokenId"] == 1
-    assert retBid["erc721Contract"] == wrappedErc721.address
+    assert retBid["remoteErc721Contract"] == wrappedErc721.address
     assert retBid["receiver"] == receiver
     assert retBid["remoteId"] == 0
     assert retBid["relayer"] == relayer

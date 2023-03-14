@@ -36,7 +36,8 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             maker:_msgSender(),
             receiver:_receiver,
             tokenId:_tokenId,
-            remoteErc721Contract:_erc721Contract,
+            localErc721Contract:_erc721Contract,
+            remoteErc721Contract:address(0),
             timestampOfBought:0,
             buyer:address(0)
         });
@@ -46,7 +47,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
 
     function buyBid(uint256 _bidId) public override(ISpokeBridge, SpokeBridge) onlyActiveRelayer() {
         super.buyBid(_bidId);
-        IWrappedERC721(outgoingBids[_bidId].remoteErc721Contract).burn(outgoingBids[_bidId].tokenId);
+        IWrappedERC721(outgoingBids[_bidId].localErc721Contract).burn(outgoingBids[_bidId].tokenId);
     }
 
     function challengeMinting(uint256 _bidId) public override payable {
@@ -61,7 +62,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                bid.remoteErc721Contract,
+                bid.localErc721Contract,
                 bid.buyer
             );
 
@@ -78,7 +79,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                bid.erc721Contract,
+                bid.remoteErc721Contract,
                 bid.relayer,
                 _msgSender()
             );
@@ -110,7 +111,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             if (status == OutgoingBidStatus.Bought &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
-                localChallengedBid.erc721Contract == localContract &&
+                localChallengedBid.remoteErc721Contract == localContract &&
                 localChallengedBid.relayer == relayer) {
                 // False challenging
                 localChallengedBid.status = IncomingBidStatus.Relayed;
@@ -131,7 +132,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 relayers[localChallengedBid.relayer].status = RelayerStatus.Malicious;
 
                 // Burning the wrong minted token
-                IWrappedERC721(localChallengedBid.erc721Contract).burn(localChallengedBid.tokenId);
+                IWrappedERC721(localChallengedBid.remoteErc721Contract).burn(localChallengedBid.tokenId);
 
                 // Dealing with the challenger
                 if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
@@ -163,7 +164,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             if (status == IncomingBidStatus.Relayed &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
-                localChallengedBid.remoteErc721Contract == localContract &&
+                localChallengedBid.localErc721Contract == localContract &&
                 localChallengedBid.buyer == relayer
             ) {
                 // False challenging
@@ -174,7 +175,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
                 relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
                 // Burning the wrong minted token
-                IWrappedERC721(localChallengedBid.remoteErc721Contract).mint(
+                IWrappedERC721(localChallengedBid.localErc721Contract).mint(
                     localChallengedBid.maker, localChallengedBid.tokenId);
 
                 // Dealing with the challenger
@@ -201,7 +202,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             status:IncomingBidStatus.Relayed,
             receiver:_to,
             tokenId:_tokenId,
-            erc721Contract:_erc721Contract,
+            remoteErc721Contract:_erc721Contract,
             timestampOfRelayed:block.timestamp,
             relayer:_msgSender()
         });

@@ -114,19 +114,19 @@ def test_relayer_relaying(init_contracts):
 
     # TODO more rever tests
     with reverts("SrcSpokeBridge: the challenging period is not expired yet!"):
-        srcSpokeBridge.unlocking(0, 0, user, 1, wrappedErc721.address, {'from': relayer});
+        srcSpokeBridge.unlocking(0, 0, user, {'from': relayer});
 
     chain.sleep(14400000) # it's 4 hours
 
     with reverts("SpokeBridge: caller is not a relayer!"):
-        srcSpokeBridge.unlocking(0, 0, user, 1, wrappedErc721.address, {'from': person});
+        srcSpokeBridge.unlocking(0, 0, user, {'from': person});
 
-    srcSpokeBridge.unlocking(0, 0, user, 1, wrappedErc721.address, {'from': relayer});
+    srcSpokeBridge.unlocking(0, 0, user, {'from': relayer});
 
     retBid = srcSpokeBridge.incomingBids(0)
     assert retBid["status"] == 1
     assert retBid["tokenId"] == 1
-    assert retBid["erc721Contract"] == contractMap.getLocal(wrappedErc721.address)
+    assert retBid["remoteErc721Contract"] == contractMap.getLocal(wrappedErc721.address)
     assert retBid["receiver"] == user
     assert retBid["remoteId"] == 0
     assert retBid["relayer"] == relayer

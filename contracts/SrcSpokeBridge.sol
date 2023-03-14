@@ -6,7 +6,7 @@ import {ISrcSpokeBridge} from "./interfaces/ISrcSpokeBridge.sol";
 
 import {SpokeBridge} from "./SpokeBridge.sol";
 
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
 abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
@@ -24,7 +24,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         address _erc721Contract) public override payable {
         require(msg.value > 0, "SrcSpokeBridge: there is no fee for relayers!");
 
-        ERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
+        IERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 
         outgoingBids[id.current()] = OutgoingBid({
             id:id.current(),
@@ -33,7 +33,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             maker:_msgSender(),
             receiver:_receiver,
             tokenId:_tokenId,
-            remoteErc721Contract:_erc721Contract,
+            localErc721Contract:_erc721Contract,
+            remoteErc721Contract:IContractMap(contractMap).getRemote(_erc721Contract),
             timestampOfBought:0,
             buyer:address(0)
         });
@@ -70,10 +71,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 bid.status,
                 bid.receiver,
                 bid.tokenId,
-                // FIXME it could be better with following remote and local contract
-                // new members?
-                bid.status == IncomingBidStatus.None ?
-                    bid.erc721Contract : IContractMap(contractMap).getRemote(bid.erc721Contract),
+                outgoingBids[bid.remoteId].remoteErc721Contract,
                 bid.relayer,
                 _msgSender()
             );
@@ -93,7 +91,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 OutgoingBidStatus status, // FIXME maybe it is not useful
                 address receiver,
                 uint256 tokenId,
-                address localContract,
+                address remoteContract,
                 address relayer
             ) = abi.decode(bidBytes, (uint256, OutgoingBidStatus, address, uint256, address, address));
 
@@ -105,7 +103,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             if (status == OutgoingBidStatus.Bought &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
-                localChallengedBid.erc721Contract == localContract &&
+                localChallengedBid.remoteErc721Contract == remoteContract &&
                 localChallengedBid.relayer == relayer) {
                 // False challenging
                 localChallengedBid.status = IncomingBidStatus.Relayed;
@@ -159,7 +157,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             if (status != IncomingBidStatus.Malicious &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
-                IContractMap(contractMap).getRemote(localChallengedBid.remoteErc721Contract) == remoteContract &&
+                localChallengedBid.remoteErc721Contract == remoteContract &&
                 localChallengedBid.buyer == relayer
             ) {
                 // False challenging
@@ -187,16 +185,14 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
     function unlocking(
         uint256 _lockingBidId,
         uint256 _bidId,
-        address _to,
-        uint256 _tokenId,
-        address _remoteErc721Contract
+        address _to
     )  public override onlyActiveRelayer {
         require(outgoingBids[_lockingBidId].status == OutgoingBidStatus.Bought, "SrcSpokeBridge: the outgoing bid is not bought!");
         require(incomingBids[_bidId].status == IncomingBidStatus.None, "SrcSpokeBridge: there is an incoming bid with the same id!");
         require(outgoingBids[_lockingBidId].timestampOfBought + 4 hours < block.timestamp,
             "SrcSpokeBridge: the challenging period is not expired yet!");
-        address localErc721Contract = IContractMap(contractMap).getLocal(_remoteErc721Contract);
-        require(ERC721(localErc721Contract).ownerOf(_tokenId) == address(this),  "SrcSpokeBridge: there is no locked token!");
+
+        require(IERC721(outgoingBids[_lockingBidId].localErc721Contract).ownerOf(outgoingBids[_lockingBidId].tokenId) == address(this),  "SrcSpokeBridge: there is no locked token!");
 
         outgoingBids[_lockingBidId].status = OutgoingBidStatus.Unlocked;
 
@@ -205,8 +201,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             outgoingId:_lockingBidId,
             status:IncomingBidStatus.Relayed,
             receiver:_to,
-            tokenId:_tokenId,
-            erc721Contract:localErc721Contract,
+            tokenId:outgoingBids[_lockingBidId].tokenId,
+            remoteErc721Contract:outgoingBids[_lockingBidId].localErc721Contract,
             timestampOfRelayed:block.timestamp,
             relayer:_msgSender()
         });
@@ -223,6 +219,7 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
         require(bid.receiver == _msgSender(), "SrcSpokeBridge: claimer is not the owner!");
 
         bid.status = IncomingBidStatus.Unlocked;
-        ERC721(bid.erc721Contract).safeTransferFrom(address(this), _msgSender(), bid.tokenId);
+        IERC721(outgoingBids[incomingBids[_incomingBidId].remoteId].localErc721Contract)
+            .safeTransferFrom(address(this), _msgSender(), bid.tokenId);
     }
 }

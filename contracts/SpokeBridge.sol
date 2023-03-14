@@ -39,20 +39,21 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         address maker;
         address receiver;
         uint256 tokenId;
-        // it is always an address on the dst chain
-        address remoteErc721Contract;
+        address localErc721Contract;
+        address remoteErc721Contract; // FIXME it is not relevant on the dst side
         uint256 timestampOfBought;
         address buyer;
     }
 
     struct IncomingBid {
         uint256 remoteId;
-        uint256 outgoingId; // FIXME it is not relevant on the  dst side
+        uint256 outgoingId; // FIXME it is not relevant on the dst side
         IncomingBidStatus status;
         address receiver;
         uint256 tokenId;
-        address erc721Contract; // FIXME better name
-        uint256 timestampOfRelayed; // FIXME better name
+        // it is always an address on the dst chain
+        address remoteErc721Contract; // FIXME it is not relevant on the src side
+        uint256 timestampOfRelayed;
         address relayer;
     }
 
