@@ -115,7 +115,8 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             // FIXME time window check
             IncomingBid memory localChallengedBid = incomingBids[bidId];
 
-            if (status == OutgoingBidStatus.Bought &&
+            if (!_isIncomingBidStatusChallangable(localChallengedBid) &&
+                status == OutgoingBidStatus.Bought &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.erc721Contract == localContract &&
@@ -132,7 +133,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             } else {
                 // Proved malicious bid(behavior)
                 localChallengedBid.status = IncomingBidStatus.Malicious;
-                relayers[relayer].status = RelayerStatus.Malicious;
+                relayers[localChallengedBid.relayer].status = RelayerStatus.Malicious;
 
                 // Burning the wrong minted token
                 IWrappedERC721(localChallengedBid.erc721Contract).burn(localChallengedBid.tokenId);
@@ -158,7 +159,8 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
 
             OutgoingBid memory localChallengedBid = outgoingBids[bidId];
 
-            if (status == IncomingBidStatus.Relayed &&
+            if (!_isOutgoingBidStatusChallangable(localChallengedBid) &&
+                status == IncomingBidStatus.Relayed &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.erc721Contract == localContract &&
@@ -175,7 +177,7 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
             } else {
                 // Proved malicious bid(behavior)
                 localChallengedBid.status = OutgoingBidStatus.Malicious;
-                relayers[relayer].status = RelayerStatus.Malicious;
+                relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
                 // Burning the wrong minted token
                 IWrappedERC721(localChallengedBid.erc721Contract).mint(

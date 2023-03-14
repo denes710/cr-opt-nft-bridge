@@ -111,14 +111,15 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
             // FIXME time window check
             IncomingBid memory localChallengedBid = incomingBids[bidId];
 
-            if (status == OutgoingBidStatus.Bought &&
+            if (!_isIncomingBidStatusChallangable(localChallengedBid) &&
+                status == OutgoingBidStatus.Bought &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.erc721Contract == localContract &&
                 localChallengedBid.relayer == relayer) {
                 // False challenging
                 localChallengedBid.status = IncomingBidStatus.Relayed;
-                relayers[relayer].status = RelayerStatus.Active;
+                relayers[localChallengedBid.relayer].status = RelayerStatus.Active;
 
                 // Dealing with the challenger
                 challengedIncomingBids[bidId].status = ChallengeStatus.None;
@@ -134,6 +135,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
                 // Burning the wrong minted token - it is not possible to claim from the incoming
                 // IWrappedERC721(localChallengedBid.localContract).burn(localChallengedBid.tokenId);
+
+                // FIXME do something with lockedId
 
                 // Dealing with the challenger
                 challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
@@ -156,11 +159,13 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
             OutgoingBid memory localChallengedBid = outgoingBids[bidId];
 
-            if (status == IncomingBidStatus.Relayed &&
+            if (!_isOutgoingBidStatusChallangable(localChallengedBid) &&
+                status == IncomingBidStatus.Relayed &&
                 localChallengedBid.receiver == receiver &&
                 localChallengedBid.tokenId == tokenId &&
                 localChallengedBid.erc721Contract == localContract &&
                 localChallengedBid.buyer == relayer) {
+
                 // False challenging
                 localChallengedBid.status = OutgoingBidStatus.Bought;
                 relayers[relayer].status = RelayerStatus.Active;
@@ -172,8 +177,9 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
                 require(isSent, "Failed to send Ether");
             } else {
                 // Proved malicious bid(behavior)
+                // localChallengedBid data is not corresponding to the bid
                 localChallengedBid.status = OutgoingBidStatus.Malicious;
-                relayers[relayer].status = RelayerStatus.Malicious;
+                relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
 
                 // FIXME unlock NFT
                 // Burning the wrong minted token
