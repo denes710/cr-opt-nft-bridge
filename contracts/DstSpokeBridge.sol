@@ -100,9 +100,8 @@ abstract contract DstSpokeBridge is IDstSpokeBridge, SpokeBridge {
     }
 
     function receiveProof(bytes memory _proof) public override onlyHub {
-        // TODO better naming for isOutGoingBid
-        (bytes memory bidBytes, bool isOutgoingBid) = abi.decode(_proof, (bytes, bool));
-        if (isOutgoingBid) {
+        (bytes memory bidBytes, bool isBidOutgoing) = abi.decode(_proof, (bytes, bool));
+        if (isBidOutgoing) {
             // On the dest chain during minting(wrong relaying), revert minting
             (
                 uint256 bidId,

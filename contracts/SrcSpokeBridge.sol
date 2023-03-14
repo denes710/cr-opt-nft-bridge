@@ -95,8 +95,8 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
     }
 
     function receiveProof(bytes memory _proof) public override onlyHub {
-        (bytes memory bidBytes, bool isOutgoingBid) = abi.decode(_proof, (bytes, bool));
-        if (isOutgoingBid) {
+        (bytes memory bidBytes, bool isBidOutgoing) = abi.decode(_proof, (bytes, bool));
+        if (isBidOutgoing) {
             // On the source chain during unlocking(wrong relaying), revert the incoming messsage
             (
                 uint256 bidId,
