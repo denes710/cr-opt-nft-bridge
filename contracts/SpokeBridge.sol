@@ -13,15 +13,6 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
 
-    // TODO there can be an undo stuff from user, but fee still remaing
-    struct LocalTransaction {
-        uint256 tokenId;
-        address maker;
-        address receiver;
-        address localErc721Contract; // it is not relevant on the dst side
-        address remoteErc721Contract;
-    }
-
     struct LocalBlock {
         LocalTransaction[] transactions;
     }
@@ -34,12 +25,10 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     struct IncomingBlock {
-        uint256 height;
-        uint32 transactionRoot;
+        bytes32 transactionRoot;
         uint256 timestampOfIncoming;
         IncomingBlockStatus status;
         address relayer;
-        // TODO something is clamimed or not
     }
 
     enum RelayerStatus {
@@ -53,7 +42,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     struct Relayer {
         RelayerStatus status;
         uint256 dateOfUndeposited;
-        // TODO use versioning chain for managing bridge interactions
         uint256 stakedAmount;
     }
 
@@ -97,7 +85,10 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     uint256 public immutable TRANS_PER_BLOCK;
 
+    uint256 public immutable TRANS_FEE;
+
     Counters.Counter public localBlockId;
+    Counters.Counter public incomingBlockId;
 
     address public immutable HUB;
 
@@ -107,6 +98,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         CHALLENGE_AMOUNT = 10 ether;
         TIME_LIMIT_OF_UNDEPOSIT = 2 days;
         TRANS_PER_BLOCK = 16;
+        TRANS_FEE = 0.01 ether;
     }
 
     modifier onlyActiveRelayer() {
@@ -126,19 +118,18 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     function sendProof(uint256 _height) public override {
-            // we can send proof about localBlocks
-            // calculateRoot(localBlocks[_height])
-            uint32 calculatedRoot = 0; // ? there is that height
-            bytes memory data = abi.encode(_height, calculatedRoot);
-            _sendMessage(data);
+        // we can send calculated merkle proof about localBlocks
+        bytes32 calculatedRoot = _height < localBlockId.current() ?
+            bytes32(0) : _getMerkleRoot(localBlocks[_height].transactions);
+        bytes memory data = abi.encode(_height, calculatedRoot);
+        _sendMessage(data);
     }
 
     function receiveProof(bytes memory _root) public override onlyHub {
-        (uint32 height, uint32 calculatedRoot) = abi.decode(_root, (uint32, uint32));
+        (uint32 height, bytes32 calculatedRoot) = abi.decode(_root, (uint32, bytes32));
 
         IncomingBlock memory incomingBlock = incomingBlocks[height];
 
-        // FIXME it is require function
         if (incomingBlock.status == IncomingBlockStatus.None) {
             return;
         }
@@ -149,7 +140,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
             relayers[incomingBlock.relayer].status = RelayerStatus.Active;
             challengedIncomingBlocks[height].status = ChallengeStatus.None;
         } else {
-            // FIXME dealing with versioning
+            // TODO versioning, after malicious behav
             // Proved malicious bid(behavior)
             incomingBlock.status = IncomingBlockStatus.Malicious;
             relayers[incomingBlock.relayer].status = RelayerStatus.Malicious;
@@ -197,16 +188,15 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         require(isSent, "Failed to send Ether");
     }
 
-    function addIncomingBlock(uint256 _height, uint32 _transactionRoot) public override onlyActiveRelayer {
-        require(incomingBlocks[_height].status == IncomingBlockStatus.None);
-
-        incomingBlocks[_height] = IncomingBlock({
-            height:_height,
+    function addIncomingBlock(bytes32 _transactionRoot) public override onlyActiveRelayer {
+        incomingBlocks[incomingBlockId.current()] = IncomingBlock({
             transactionRoot:_transactionRoot,
             timestampOfIncoming:block.timestamp,
             status:IncomingBlockStatus.Relayed,
             relayer:_msgSender()
         });
+
+        incomingBlockId.increment();
     }
 
     function challengeIncomingBlock(uint256 _height) public override payable {
@@ -233,4 +223,61 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function _sendMessage(bytes memory _data) internal virtual;
 
     function _getCrossMessageSender() internal virtual returns (address);
+
+    function _getMerkleRoot(LocalTransaction[] memory _transactions) internal view returns (bytes32) {
+        bytes32[] memory hashes = new bytes32[](_transactions.length);
+
+        uint32 idx = 0;
+        for (uint i = 0; i < _transactions.length; i++) {
+            hashes[idx++] = keccak256(abi.encode(
+                _transactions[i].tokenId,
+                _transactions[i].maker,
+                _transactions[i].receiver,
+                _transactions[i].localErc721Contract,
+                _transactions[i].remoteErc721Contract
+            ));
+        }
+
+        uint n = _transactions.length;
+        uint offset = 0;
+
+        while (n > 0) {
+            for (uint i = 0; i < n - 1; i += 2) {
+                hashes[idx++] = keccak256(abi.encodePacked(hashes[offset + i], hashes[offset + i + 1]));
+            }
+            offset += n;
+            n = n / 2;
+        }
+
+        return hashes[hashes.length - 1];
+    }
+
+    function _verifyMerkleProof(
+        bytes32[] calldata _proof,
+        bytes32 _root,
+        LocalTransaction calldata _transaction,
+        uint _index
+    ) internal view returns (bool) {
+        bytes32 hash = keccak256(abi.encode(
+                _transaction.tokenId,
+                _transaction.maker,
+                _transaction.receiver,
+                _transaction.localErc721Contract,
+                _transaction.remoteErc721Contract
+            ));
+
+        for (uint i = 0; i < _proof.length; i++) {
+            bytes32 proofElement = _proof[i];
+
+            if (_index % 2 == 0) {
+                hash = keccak256(abi.encodePacked(hash, proofElement));
+            } else {
+                hash = keccak256(abi.encodePacked(proofElement, hash));
+            }
+
+            _index = _index / 2;
+        }
+
+        return hash == _root;
+    }
 }

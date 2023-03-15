@@ -13,13 +13,13 @@ abstract contract SrcSpokeBridge is SpokeBridge {
 
     address public contractMap;
 
+    mapping(bytes32 => mapping(address => mapping(uint256 => bool))) claimedProofs;
+
     constructor(address _contractMap, address _hub) SpokeBridge(_hub) {
         contractMap = _contractMap;
     }
 
     function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) public override {
-        // it is on nft claim        require(msg.value > 0, "SrcSpokeBridge: there is no fee for relayers!");
-
         IERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 
         localBlocks[localBlockId.current()].transactions.push(LocalTransaction({
@@ -35,18 +35,38 @@ abstract contract SrcSpokeBridge is SpokeBridge {
         }
     }
 
-    function claimNFT(uint256 _incomingBidId) public override payable {
-//        IncomingBid memory bid = incomingBids[_incomingBidId];
-/*
-        require(bid.status == IncomingBidStatus.Relayed,
-            "SrcSpokeBride: incoming bid has no Relayed state!");
-        require(bid.timestampOfRelayed + 4 hours < block.timestamp,
-            "SrcSpokeBridge: the challenging period is not expired yet!");
-        require(bid.receiver == _msgSender(), "SrcSpokeBridge: claimer is not the owner!");
+    function claimNFT(
+        uint256 _incomingBlockId,
+        LocalTransaction calldata _transaction,
+        bytes32[] calldata _proof,
+        uint _index
+    ) public override payable {
+        IncomingBlock memory incomingBlock = incomingBlocks[_incomingBlockId];
 
-        bid.status = IncomingBidStatus.Unlocked;
-        IERC721(outgoingBids[incomingBids[_incomingBidId].outgoingId].localErc721Contract)
-            .safeTransferFrom(address(this), _msgSender(), bid.tokenId);
-            */
+        require(msg.value == TRANS_FEE, "SrcSpokeBridge: there is no enough fee for relayers!");
+
+        require(incomingBlock.status == IncomingBlockStatus.Relayed,
+            "SrcSpokeBride: incoming block has no Relayed state!");
+        require(incomingBlock.timestampOfIncoming + 4 hours < block.timestamp,
+            "SrcSpokeBridge: the challenging period is not expired yet!");
+        require(relayers[incomingBlock.relayer].status == RelayerStatus.Active,
+            "SrcSpokeBridge: the relayer has no active status");
+
+        require(_verifyMerkleProof(_proof, incomingBlock.transactionRoot, _transaction, _index),
+            "SrcSpokeBridge: proof is not correct during claming!");
+
+        require(_transaction.receiver == _msgSender(),
+            "SrcSpokeBridge: receiver is not the message sender!");
+
+        require(!claimedProofs[incomingBlock.transactionRoot]
+            [_transaction.localErc721Contract]
+            [_transaction.tokenId], "SrcSpokeBridge: token is already claimed!");
+
+        claimedProofs[incomingBlock.transactionRoot]
+            [_transaction.localErc721Contract]
+            [_transaction.tokenId] = true;
+
+        IERC721(_transaction.localErc721Contract)
+            .safeTransferFrom(address(this), _transaction.receiver, _transaction.tokenId);
     }
 }

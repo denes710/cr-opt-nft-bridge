@@ -13,21 +13,29 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract DstSpokeBridge is SpokeBridge {
     using Counters for Counters.Counter;
 
+    struct Claim {
+        uint256 timestampOfClaiming;
+        bool isClaimed;
+    }
+
+    mapping(bytes32 => mapping(address => mapping(uint256 => bool))) claimedProofs;
+    mapping(address => mapping(uint256 => uint256)) claimedTokens;
+
     constructor(address _hub) SpokeBridge(_hub) {
     }
 
     function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) public override {
-        // it is on nft claim        require(msg.value > 0, "SrcSpokeBridge: there is no fee for relayers!");
-        // FIXME root hash timestamp check maybe ~~~ when it was claimed
-        // owner of the msgSEnder ??? require()
+        require(IWrappedERC721(_erc721Contract).ownerOf(_tokenId) == _msgSender(), "DstSpokeBridge: owner is not the caller!");
+        require(claimedTokens[_erc721Contract][_tokenId] + 4 hours < block.timestamp, "DesSpokeBridge: challenging time window is not expired yet!");
+
         IWrappedERC721(_erc721Contract).burn(_tokenId);
 
         localBlocks[localBlockId.current()].transactions.push(LocalTransaction({
             tokenId:_tokenId,
             maker:_msgSender(),
             receiver:_receiver,
-            localErc721Contract:_erc721Contract,
-            remoteErc721Contract:address(0) // it is not used
+            localErc721Contract:address(0), // it is not used
+            remoteErc721Contract:_erc721Contract
         }));
 
         if (localBlocks[localBlockId.current()].transactions.length == TRANS_PER_BLOCK) {
@@ -35,18 +43,43 @@ abstract contract DstSpokeBridge is SpokeBridge {
         }
     }
 
-    function claimNFT(uint256 _incomingBidId) public override payable {
-//        IncomingBid memory bid = incomingBids[_incomingBidId];
-/*
-        require(bid.status == IncomingBidStatus.Relayed,
-            "SrcSpokeBride: incoming bid has no Relayed state!");
-        require(bid.timestampOfRelayed + 4 hours < block.timestamp,
-            "SrcSpokeBridge: the challenging period is not expired yet!");
-        require(bid.receiver == _msgSender(), "SrcSpokeBridge: claimer is not the owner!");
+    function claimNFT(
+        uint256 _incomingBlockId,
+        LocalTransaction calldata _transaction,
+        bytes32[] calldata _proof,
+        uint _index
+    ) public override payable {
+        IncomingBlock memory incomingBlock = incomingBlocks[_incomingBlockId];
 
-        bid.status = IncomingBidStatus.Unlocked;
-        IERC721(outgoingBids[incomingBids[_incomingBidId].outgoingId].localErc721Contract)
-            .safeTransferFrom(address(this), _msgSender(), bid.tokenId);
-            */
+        require(msg.value == TRANS_FEE, "DstSpokeBridge: there is no enough fee for relayers!");
+
+        require(incomingBlock.status == IncomingBlockStatus.Relayed,
+            "DstSpokeBride: incoming block has no Relayed state!");
+
+        // there is no timestamp check only druing adding to the block
+
+        // TODO versioning, better check for malicious block
+        require(relayers[incomingBlock.relayer].status == RelayerStatus.Active,
+            "DstSpokeBridge: the relayer has no active status");
+
+        require(_verifyMerkleProof(_proof, incomingBlock.transactionRoot, _transaction, _index),
+            "DstSpokeBridge: proof is not correct during claming!");
+
+        require(_transaction.receiver == _msgSender(),
+            "DstSpokeBridge: receiver is not the message sender!");
+
+
+        require(!claimedProofs[incomingBlock.transactionRoot]
+            [_transaction.remoteErc721Contract]
+            [_transaction.tokenId], "DstSpokeBridge: token is already claimed!");
+
+        claimedProofs[incomingBlock.transactionRoot]
+            [_transaction.remoteErc721Contract]
+            [_transaction.tokenId] = true;
+
+        claimedTokens[_transaction.remoteErc721Contract][_transaction.tokenId] = block.timestamp;
+        
+
+        IWrappedERC721(_transaction.remoteErc721Contract).mint(_transaction.receiver, _transaction.tokenId);
     }
 }
