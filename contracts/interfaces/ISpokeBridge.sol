@@ -18,11 +18,9 @@ interface ISpokeBridge is IERC721Receiver {
 
     event NFTUnwrapped(address contractAddress, uint256 bidId, uint256 id, address owner);
 
-    function buyBid(uint256 _bidId) external;
+    function sendProof(uint256 _height) external;
 
-    function sendProof(bool _isOutgoingBid, uint256 _bidId) external;
-
-    function receiveProof(bytes memory _proof) external;
+    function receiveProof(bytes memory _root) external;
 
     function deposite() external payable;
 
@@ -30,5 +28,13 @@ interface ISpokeBridge is IERC721Receiver {
 
     function claimDeposite() external;
 
-    function claimChallengeReward(uint256 _challengeId, bool _isOutgoingBid) external;
+    function claimChallengeReward(uint256 _challengeId) external;
+
+    function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) external;
+
+    function addIncomingBlock(uint256 _height, uint32 _transactionRoot) external;
+
+    function challengeIncomingBlock(uint256 _height) external payable;
+
+    function claimNFT(uint256 _height) external payable;
 }

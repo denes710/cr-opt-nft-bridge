@@ -13,48 +13,33 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
 
-    // FIXME outgoing and incoming bid are different a little bit on dst and src sides
-    enum OutgoingBidStatus {
-        None,
-        Created,
-        Bought,
-        Challenged,
-        Malicious,
-        Unlocked // it is used only on src
+    // TODO there can be an undo stuff from user, but fee still remaing
+    struct LocalTransaction {
+        uint256 tokenId;
+        address maker;
+        address receiver;
+        address localErc721Contract; // it is not relevant on the dst side
+        address remoteErc721Contract;
     }
 
-    enum IncomingBidStatus {
+    struct LocalBlock {
+        LocalTransaction[] transactions;
+    }
+
+    enum IncomingBlockStatus {
         None,
         Relayed,
         Challenged,
-        Malicious,
-        Unlocked // it is used only on src
+        Malicious
     }
 
-    struct OutgoingBid {
-        OutgoingBidStatus status;
-        uint256 fee;
-        // the original owner
-        address maker;
-        // the new owner
-        address receiver;
-        uint256 tokenId;
-        address localErc721Contract;
-        address remoteErc721Contract; // it is not relevant on the dst side
-        uint256 timestampOfBought;
-        // the relayer
-        address buyer;
-    }
-
-    struct IncomingBid {
-        uint256 outgoingId; // it is not relevant on the dst side
-        IncomingBidStatus status;
-        address receiver;
-        uint256 tokenId;
-        // it is always an address on the dst chain
-        address remoteErc721Contract; // it is not relevant on the src side
-        uint256 timestampOfRelayed;
+    struct IncomingBlock {
+        uint256 height;
+        uint32 transactionRoot;
+        uint256 timestampOfIncoming;
+        IncomingBlockStatus status;
         address relayer;
+        // TODO something is clamimed or not
     }
 
     enum RelayerStatus {
@@ -67,7 +52,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     struct Relayer {
         RelayerStatus status;
-        uint dateOfUndeposited;
+        uint256 dateOfUndeposited;
         // TODO use versioning chain for managing bridge interactions
         uint256 stakedAmount;
     }
@@ -97,13 +82,12 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     mapping(address => Relayer) public relayers;
 
-    mapping(uint256 => IncomingBid) public incomingBids;
-    mapping(uint256 => OutgoingBid) public outgoingBids;
+    mapping(uint256 => IncomingBlock) public incomingBlocks;
+    mapping(uint256 => LocalBlock) internal localBlocks;
 
-    mapping(uint256 => Challenge) public challengedIncomingBids;
+    mapping(uint256 => Challenge) public challengedIncomingBlocks;
 
     mapping(uint256 => Reward) public incomingChallengeRewards;
-    mapping(uint256 => Reward) public outgoingChallengeRewards;
 
     uint256 public immutable STAKE_AMOUNT;
 
@@ -111,7 +95,9 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     uint256 public immutable TIME_LIMIT_OF_UNDEPOSIT;
 
-    Counters.Counter public id;
+    uint256 public immutable TRANS_PER_BLOCK;
+
+    Counters.Counter public localBlockId;
 
     address public immutable HUB;
 
@@ -120,6 +106,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         STAKE_AMOUNT = 20 ether;
         CHALLENGE_AMOUNT = 10 ether;
         TIME_LIMIT_OF_UNDEPOSIT = 2 days;
+        TRANS_PER_BLOCK = 16;
     }
 
     modifier onlyActiveRelayer() {
@@ -138,15 +125,42 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         _;
     }
 
-    function buyBid(uint256 _bidId) public virtual override onlyActiveRelayer() {
-        require(outgoingBids[_bidId].status == OutgoingBidStatus.Created,
-            "SpokeBridge: bid does not have Created state");
-        outgoingBids[_bidId].status = OutgoingBidStatus.Bought;
-        outgoingBids[_bidId].buyer = _msgSender();
-        outgoingBids[_bidId].timestampOfBought = block.timestamp;
+    function sendProof(uint256 _height) public override {
+            // we can send proof about localBlocks
+            // calculateRoot(localBlocks[_height])
+            uint32 calculatedRoot = 0; // ? there is that height
+            bytes memory data = abi.encode(_height, calculatedRoot);
+            _sendMessage(data);
+    }
 
-        (bool isSent,) = _msgSender().call{value: outgoingBids[_bidId].fee}("");
-        require(isSent, "Failed to send Ether");
+    function receiveProof(bytes memory _root) public override onlyHub {
+        (uint32 height, uint32 calculatedRoot) = abi.decode(_root, (uint32, uint32));
+
+        IncomingBlock memory incomingBlock = incomingBlocks[height];
+
+        // FIXME it is require function
+        if (incomingBlock.status == IncomingBlockStatus.None) {
+            return;
+        }
+
+        if (incomingBlock.transactionRoot == calculatedRoot) {
+            // False challenging
+            incomingBlock.status = IncomingBlockStatus.Relayed;
+            relayers[incomingBlock.relayer].status = RelayerStatus.Active;
+            challengedIncomingBlocks[height].status = ChallengeStatus.None;
+        } else {
+            // FIXME dealing with versioning
+            // Proved malicious bid(behavior)
+            incomingBlock.status = IncomingBlockStatus.Malicious;
+            relayers[incomingBlock.relayer].status = RelayerStatus.Malicious;
+
+            // Dealing with the challenger
+            if (challengedIncomingBlocks[height].status == ChallengeStatus.Challenged) {
+                incomingChallengeRewards[height].challenger = challengedIncomingBlocks[height].challenger;
+                incomingChallengeRewards[height].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 4;
+            }
+            challengedIncomingBlocks[height].status = ChallengeStatus.Proved;
+        }
     }
 
     function deposite() public override payable {
@@ -172,26 +186,41 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         relayers[_msgSender()].status = RelayerStatus.None;
     }
 
-    function claimChallengeReward(uint256 _challengeId, bool _isOutgoingBid) public override {
-        if (_isOutgoingBid) {
-            require(!outgoingChallengeRewards[_challengeId].isClaimed, "SpokeBridge: reward is already claimed!");
-            require(outgoingChallengeRewards[_challengeId].challenger == _msgSender(),
-                "SpokeBridge: challenger is not the sender!");
+    function claimChallengeReward(uint256 _challengeId) public override {
+        require(!incomingChallengeRewards[_challengeId].isClaimed, "SpokeBridge: reward is already claimed!");
+        require(incomingChallengeRewards[_challengeId].challenger == _msgSender(),
+            "SpokeBridge: challenger is not the sender!");
 
-            outgoingChallengeRewards[_challengeId].isClaimed = true;
+        incomingChallengeRewards[_challengeId].isClaimed = true;
 
-            (bool isSent,) = _msgSender().call{value: outgoingChallengeRewards[_challengeId].amount}("");
-            require(isSent, "Failed to send Ether");
-        } else {
-            require(!incomingChallengeRewards[_challengeId].isClaimed, "SpokeBridge: reward is already claimed!");
-            require(incomingChallengeRewards[_challengeId].challenger == _msgSender(),
-                "SpokeBridge: challenger is not the sender!");
+        (bool isSent,) = _msgSender().call{value: incomingChallengeRewards[_challengeId].amount}("");
+        require(isSent, "Failed to send Ether");
+    }
 
-            incomingChallengeRewards[_challengeId].isClaimed = true;
-            
-            (bool isSent,) = _msgSender().call{value: incomingChallengeRewards[_challengeId].amount}("");
-            require(isSent, "Failed to send Ether");
-        }
+    function addIncomingBlock(uint256 _height, uint32 _transactionRoot) public override onlyActiveRelayer {
+        require(incomingBlocks[_height].status == IncomingBlockStatus.None);
+
+        incomingBlocks[_height] = IncomingBlock({
+            height:_height,
+            transactionRoot:_transactionRoot,
+            timestampOfIncoming:block.timestamp,
+            status:IncomingBlockStatus.Relayed,
+            relayer:_msgSender()
+        });
+    }
+
+    function challengeIncomingBlock(uint256 _height) public override payable {
+        require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");
+        require(incomingBlocks[_height].status == IncomingBlockStatus.Relayed, "SpokeBridge: Corresponding incoming bid status is not relayed!");
+        require(incomingBlocks[_height].timestampOfIncoming + 4 hours > block.timestamp, "SpokeBridge: The dispute period is expired!");
+        require(challengedIncomingBlocks[_height].status == ChallengeStatus.None, "SpokeBridge: bid is already challenged!");
+
+        incomingBlocks[_height].status = IncomingBlockStatus.Challenged;
+
+        challengedIncomingBlocks[_height].challenger = _msgSender();
+        challengedIncomingBlocks[_height].status = ChallengeStatus.Challenged;
+
+        relayers[incomingBlocks[_height].relayer].status = RelayerStatus.Challenged;
     }
 
     /**
@@ -204,18 +233,4 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function _sendMessage(bytes memory _data) internal virtual;
 
     function _getCrossMessageSender() internal virtual returns (address);
-
-    function _challengeUnlocking(uint256 _bidId) internal {
-        require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");
-        require(incomingBids[_bidId].status == IncomingBidStatus.Relayed, "SpokeBridge: Corresponding incoming bid status is not relayed!");
-        require(incomingBids[_bidId].timestampOfRelayed + 4 hours > block.timestamp, "SpokeBridge: The dispute period is expired!");
-        require(challengedIncomingBids[_bidId].status == ChallengeStatus.None, "SpokeBridge: bid is already challenged!");
-
-        incomingBids[_bidId].status = IncomingBidStatus.Challenged;
-
-        challengedIncomingBids[_bidId].challenger = _msgSender();
-        challengedIncomingBids[_bidId].status = ChallengeStatus.Challenged;
-
-        relayers[incomingBids[_bidId].relayer].status = RelayerStatus.Challenged;
-    }
 }
