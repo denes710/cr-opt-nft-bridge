@@ -13,9 +13,12 @@ def init_contracts():
 
     hub = accounts[0].deploy(SimpleGatewayHub)
 
-    srcSpokeBridge = accounts[0].deploy(SimpleGatewaySrcSpokeBrdige, hub, contractMap)
-    erc721.mint(accounts[1], 1, {'from': accounts[0]})
-    erc721.approve(srcSpokeBridge.address, 1, {'from': accounts[1]})
+    # 4 nft/transaction per block
+    srcSpokeBridge = accounts[0].deploy(SimpleGatewaySrcSpokeBrdige, contractMap, hub, 4, Wei("0.01 ether"))
+
+    for i in range(1, 10):
+        erc721.mint(accounts[1], i, {'from': accounts[0]})
+        erc721.approve(srcSpokeBridge.address, i, {'from': accounts[1]})
 
     return srcSpokeBridge, contractMap, erc721, wrappedErc721
 
@@ -55,26 +58,26 @@ def test_relayer_undepositing(init_contracts):
 
     assert prev_relayer_balance + Wei("20 ether") == relayer.balance()
 
-def test_user_creating_bid(init_contracts):
+def test_user_adding_transaction(init_contracts):
     srcSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
 
     user = accounts[1]
     person = accounts[2]
     receiver = accounts[3]
 
-    with reverts("SrcSpokeBridge: there is no fee for relayers!"):
-        srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user})
     with reverts("ERC721: transfer from incorrect owner"):
-        srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': person, 'amount': Wei("20 ether")})
+        srcSpokeBridge.addNewTransactionToBlock(receiver, 1, erc721.address, {'from': person})
 
-    srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user, 'amount': Wei("0.01 ether")})
+    srcSpokeBridge.addNewTransactionToBlock(receiver, 1, erc721.address, {'from': user})
 
-    retBid = srcSpokeBridge.outgoingBids(0)
-    assert retBid["status"] == 1
+    assert erc721.ownerOf(1) == srcSpokeBridge.address
+
+    retBid = srcSpokeBridge.getLocalTransaction(0, 0)
+    assert retBid["maker"] == user
     assert retBid["receiver"] == receiver
-    assert retBid["tokenId"] == 1
+    assert retBid["localErc721Contract"] == erc721.address
 
-def test_relayer_buying_bid(init_contracts):
+def test_new_block(init_contracts):
     srcSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
 
     user = accounts[1]
@@ -84,21 +87,13 @@ def test_relayer_buying_bid(init_contracts):
 
     srcSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user, 'amount': Wei("0.01 ether")})
+    for i in range(1, 5):
+        srcSpokeBridge.addNewTransactionToBlock(receiver, i, erc721.address, {'from': user})
 
-    with reverts("SpokeBridge: caller is not a relayer!"):
-        srcSpokeBridge.buyBid(0, {'from': person})
+    assert srcSpokeBridge.localBlockId() == 1
 
-    prev_relayer_balance = relayer.balance()
-    srcSpokeBridge.buyBid(0, {'from': relayer})
-    assert prev_relayer_balance + Wei("0.01 ether") == relayer.balance()
-
-    with reverts("SpokeBridge: bid does not have Created state"):
-        srcSpokeBridge.buyBid(0, {'from': relayer})
-
-    retBid = srcSpokeBridge.outgoingBids(0)
-    assert retBid["status"] == 2
-    assert retBid["buyer"] == relayer
+    # it will be on the new block
+    srcSpokeBridge.addNewTransactionToBlock(receiver, 5, erc721.address, {'from': user})
 
 def test_relayer_relaying(init_contracts):
     srcSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
@@ -110,28 +105,21 @@ def test_relayer_relaying(init_contracts):
 
     srcSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user, 'amount': Wei("0.01 ether")})
-    srcSpokeBridge.buyBid(0, {'from': relayer})
+    for i in range(1, 5):
+        srcSpokeBridge.addNewTransactionToBlock(receiver, i, erc721.address, {'from': user})
 
-    with reverts("SrcSpokeBridge: the challenging period is not expired yet!"):
-        srcSpokeBridge.unlocking(0, 0, user, {'from': relayer});
-
-    chain.sleep(14400000) # it's 4 hours
+    # calculate a valid root
+    srcSpokeBridge.calculateTransactionHashes(0)
+    transaction_root = srcSpokeBridge.getRoot()
 
     with reverts("SpokeBridge: caller is not a relayer!"):
-        srcSpokeBridge.unlocking(0, 0, user, {'from': person})
+        srcSpokeBridge.addIncomingBlock(transaction_root, {'from': person})
 
-    srcSpokeBridge.unlocking(0, 0, user, {'from': relayer})
-
-    with reverts("SrcSpokeBridge: the outgoing bid is not bought!"):
-        srcSpokeBridge.unlocking(0, 0, user, {'from': relayer})
-
-    retBid = srcSpokeBridge.incomingBids(0)
-    assert retBid["status"] == 1
-    assert retBid["tokenId"] == 1
-    assert retBid["remoteErc721Contract"] == contractMap.getLocal(wrappedErc721.address)
-    assert retBid["receiver"] == user
-    assert retBid["relayer"] == relayer
+    srcSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
+    incomingBlock = srcSpokeBridge.incomingBlocks(0)
+    assert transaction_root == incomingBlock["transactionRoot"]
+    assert 1 == incomingBlock["status"]
+    assert relayer == incomingBlock["relayer"]
 
 def test_user_claiming_nft(init_contracts):
     srcSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
@@ -143,22 +131,35 @@ def test_user_claiming_nft(init_contracts):
 
     srcSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user, 'amount': Wei("0.01 ether")})
-    srcSpokeBridge.buyBid(0, {'from': relayer})
+    for i in range(1, 5):
+        srcSpokeBridge.addNewTransactionToBlock(receiver, i, erc721.address, {'from': user})
 
-    chain.sleep(14400000) # it's 4 hours
+    # calculate a valid root
+    srcSpokeBridge.calculateTransactionHashes(0)
+    transaction_root = srcSpokeBridge.getRoot()
+    proof = [srcSpokeBridge.hashes(0), srcSpokeBridge.hashes(5)]
 
-    srcSpokeBridge.unlocking(0, 0, user, {'from': relayer})
+    srcSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
 
-    with reverts("SrcSpokeBride: incoming bid has no Relayed state!"):
-        srcSpokeBridge.claimNFT(1, {'from': user})
+    with reverts("SrcSpokeBridge: there is no enough fee for relayers!"):
+        srcSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof, 1, {'from': receiver})
+
     with reverts("SrcSpokeBridge: the challenging period is not expired yet!"):
-        srcSpokeBridge.claimNFT(0, {'from': user})
+        srcSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof, 1, {'from': receiver, 'amount': Wei("0.01 ether")})
 
     chain.sleep(14400000) # it's 4 hours
 
-    with reverts("SrcSpokeBridge: claimer is not the owner!"):
-        srcSpokeBridge.claimNFT(0, {'from': relayer})
+    with reverts("SrcSpokeBridge: proof is not correct during claming!"):
+        srcSpokeBridge.claimNFT(0, [1, user, receiver, erc721.address, wrappedErc721.address], proof, 1, {'from': receiver, 'amount': Wei("0.01 ether")})
 
-    srcSpokeBridge.claimNFT(0, {'from': user})
-    assert erc721.ownerOf(1) == user
+    with reverts("SrcSpokeBridge: receiver is not the message sender!"):
+        srcSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof, 1, {'from': user, 'amount': Wei("0.01 ether")})
+
+    prev_balance = relayer.balance()
+    srcSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof, 1, {'from': receiver, 'amount': Wei("0.01 ether")})
+    assert prev_balance + Wei("0.01 ether") == relayer.balance()
+
+    with reverts("SrcSpokeBridge: token is already claimed!"):
+        srcSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof, 1, {'from': receiver, 'amount': Wei("0.01 ether")})
+
+    assert erc721.ownerOf(2) == receiver

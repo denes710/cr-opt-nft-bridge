@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
+import {LibLocalTransaction} from "../libraries/LibLocalTransaction.sol";
+
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 /**
  * @notice This interface will send and receive messages.
  */
 interface ISpokeBridge is IERC721Receiver {
-    // TODO undo for adding transaction, fee for this is necessary
-    struct LocalTransaction {
-        uint256 tokenId;
-        address maker;
-        address receiver;
-        // always the address of a smart contract on the src side
-        address localErc721Contract; // it is not relevant on the dst side
-        // always the address of a smart contract on the dest side
-        address remoteErc721Contract;
-    }
-
     // FIXME defines and uses these events
     event BidCreated();
 
@@ -39,7 +30,7 @@ interface ISpokeBridge is IERC721Receiver {
 
     function claimDeposite() external;
 
-    function claimChallengeReward(uint256 _challengeId) external;
+    function claimChallengeReward() external;
 
     function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) external;
 
@@ -49,10 +40,12 @@ interface ISpokeBridge is IERC721Receiver {
 
     function claimNFT(
         uint256 _incomingBlockId,
-        LocalTransaction memory _transaction,
+        LibLocalTransaction.LocalTransaction memory _transaction,
         bytes32[] memory _proof,
         uint _index
     ) external payable;
 
     function restore() external;
+
+    function getLocalTransaction(uint256 _blockNum, uint256 _txIdx) external view returns (LibLocalTransaction.LocalTransaction memory);
 }

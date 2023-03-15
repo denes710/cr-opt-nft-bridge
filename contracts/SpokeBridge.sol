@@ -3,6 +3,8 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import {ISpokeBridge} from "./interfaces/ISpokeBridge.sol";
 
+import {LibLocalTransaction} from "./libraries/LibLocalTransaction.sol";
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
@@ -12,9 +14,10 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
  */
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
+    using LibLocalTransaction for LibLocalTransaction.LocalTransaction;
 
     struct LocalBlock {
-        LocalTransaction[] transactions;
+        LibLocalTransaction.LocalTransaction[] transactions;
     }
 
     enum IncomingBlockStatus {
@@ -106,13 +109,13 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     address public immutable HUB;
 
-    constructor(address _hub) {
+    constructor(address _hub, uint256 _transferPerBlock, uint256 _transFee) {
         HUB = _hub;
         STAKE_AMOUNT = 20 ether;
         CHALLENGE_AMOUNT = 10 ether;
         TIME_LIMIT_OF_UNDEPOSIT = 2 days;
-        TRANS_PER_BLOCK = 16;
-        TRANS_FEE = 0.01 ether;
+        TRANS_PER_BLOCK = _transferPerBlock;
+        TRANS_FEE = _transFee;
     }
 
     modifier onlyInActiveStatus() {
@@ -159,7 +162,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
         (uint32 height, bytes32 calculatedRoot) = abi.decode(_root, (uint32, bytes32));
 
-        IncomingBlock memory incomingBlock = incomingBlocks[height];
+        IncomingBlock storage incomingBlock = incomingBlocks[height];
 
         require(incomingBlock.status == IncomingBlockStatus.Challenged,
             "SpokeBridge: incoming block has no challenged status!");
@@ -233,7 +236,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         relayers[_msgSender()].status = RelayerStatus.None;
     }
 
-    function claimChallengeReward(uint256 _challengeId) public override onlyInActiveStatus {
+    function claimChallengeReward() public override onlyInActiveStatus {
+        require(incomingChallengeRewards[_msgSender()].amount != 0, "SpokeBridge: there is no reward!");
         require(!incomingChallengeRewards[_msgSender()].isClaimed, "SpokeBridge: reward is already claimed!");
 
         incomingChallengeRewards[_msgSender()].isClaimed = true;
@@ -274,6 +278,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         challengedIncomingBlocks[_height].challenger = _msgSender();
         challengedIncomingBlocks[_height].status = ChallengeStatus.Challenged;
 
+        relayers[incomingBlocks[_height].relayer].againstChallenges.increment();
         relayers[incomingBlocks[_height].relayer].status = RelayerStatus.Challenged;
     }
 
@@ -286,10 +291,21 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         }
 
         // set the next incoming block id
-        incomingBlockId = firstMaliciousBlockHeight - 1;
+        if (firstMaliciousBlockHeight != 0) {
+            incomingBlockId = firstMaliciousBlockHeight - 1;
+        } else {
+            incomingBlockId = 0;
+        }
+
         firstMaliciousBlockHeight = 0;
     }
 
+    function getLocalTransaction(
+        uint256 _blockNum,
+        uint256 _txIdx
+    ) public view override returns (LibLocalTransaction.LocalTransaction memory) {
+        return localBlocks[_blockNum].transactions[_txIdx];
+    }
 
     /**
      * Always returns `IERC721Receiver.onERC721Received.selector`.
@@ -302,7 +318,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     function _getCrossMessageSender() internal virtual returns (address);
 
-    function _getMerkleRoot(LocalTransaction[] memory _transactions) internal view returns (bytes32) {
+    function _getMerkleRoot(LibLocalTransaction.LocalTransaction[] memory _transactions) internal view returns (bytes32) {
         bytes32[] memory hashes = new bytes32[](_transactions.length);
 
         uint32 idx = 0;
@@ -333,7 +349,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function _verifyMerkleProof(
         bytes32[] calldata _proof,
         bytes32 _root,
-        LocalTransaction calldata _transaction,
+        LibLocalTransaction.LocalTransaction calldata _transaction,
         uint _index
     ) internal view returns (bool) {
         bytes32 hash = keccak256(abi.encode(
