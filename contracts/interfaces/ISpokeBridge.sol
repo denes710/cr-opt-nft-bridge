@@ -43,7 +43,7 @@ interface ISpokeBridge is IERC721Receiver {
 
     function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) external;
 
-    function addIncomingBlock(uint256 _height, bytes32 _transactionRoot) external;
+    function addIncomingBlock(bytes32 _transactionRoot) external;
 
     function challengeIncomingBlock(uint256 _height) external payable;
 
@@ -53,4 +53,6 @@ interface ISpokeBridge is IERC721Receiver {
         bytes32[] memory _proof,
         uint _index
     ) external payable;
+
+    function restore() external;
 }

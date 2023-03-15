@@ -43,18 +43,20 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         RelayerStatus status;
         uint256 dateOfUndeposited;
         uint256 stakedAmount;
+        Counters.Counter againstChallenges;
     }
 
     /**
      * @dev Status of a challenge:
      *      0 - no challenge
      *      1 - challenge is in progress
-     *      2 - challenge was correct/
+     *      2 - challenge was correct
      */
     enum ChallengeStatus {
         None,
         Challenged,
-        Proved
+        Proved,
+        Malicious
     }
 
     struct Challenge {
@@ -63,20 +65,35 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     struct Reward {
-        address challenger;
         uint256 amount;
         bool isClaimed;
     }
 
+    enum BridgeStatus {
+        Active,
+        Challenged,
+        Paused
+    }
+
+    BridgeStatus public status;
+
     mapping(address => Relayer) public relayers;
 
-    mapping(uint256 => IncomingBlock) public incomingBlocks;
+    // local block
     mapping(uint256 => LocalBlock) internal localBlocks;
+    Counters.Counter public localBlockId;
 
+    // incoming block
+    mapping(uint256 => IncomingBlock) public incomingBlocks;
+    uint256 incomingBlockId;
+
+    // challenge
     mapping(uint256 => Challenge) public challengedIncomingBlocks;
+    mapping(address => Reward) public incomingChallengeRewards;
+    Counters.Counter public numberOfChallenges;
+    uint256 public firstMaliciousBlockHeight;
 
-    mapping(uint256 => Reward) public incomingChallengeRewards;
-
+    // constant
     uint256 public immutable STAKE_AMOUNT;
 
     uint256 public immutable CHALLENGE_AMOUNT;
@@ -87,9 +104,6 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     uint256 public immutable TRANS_FEE;
 
-    Counters.Counter public localBlockId;
-    Counters.Counter public incomingBlockId;
-
     address public immutable HUB;
 
     constructor(address _hub) {
@@ -99,6 +113,21 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         TIME_LIMIT_OF_UNDEPOSIT = 2 days;
         TRANS_PER_BLOCK = 16;
         TRANS_FEE = 0.01 ether;
+    }
+
+    modifier onlyInActiveStatus() {
+        require(status == BridgeStatus.Active, "SpokeBridge: bridge is not active!");
+        _;
+    }
+
+    modifier onlyInChallengedStatus() {
+        require(status == BridgeStatus.Challenged, "SpokeBridge: bridge is not challenged!");
+        _;
+    }
+
+    modifier onlyInPausedStatus() {
+        require(status == BridgeStatus.Paused, "SpokeBridge: bridge is not paused!");
+        _;
     }
 
     modifier onlyActiveRelayer() {
@@ -118,7 +147,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     function sendProof(uint256 _height) public override {
-        // we can send calculated merkle proof about localBlocks
+        // we can send a calculated merkle proof about localBlocks, it is always a trusted event
         bytes32 calculatedRoot = _height < localBlockId.current() ?
             bytes32(0) : _getMerkleRoot(localBlocks[_height].transactions);
         bytes memory data = abi.encode(_height, calculatedRoot);
@@ -126,35 +155,62 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     }
 
     function receiveProof(bytes memory _root) public override onlyHub {
+        require(status != BridgeStatus.Active, "SpokeBridge: bride status is active!");
+
         (uint32 height, bytes32 calculatedRoot) = abi.decode(_root, (uint32, bytes32));
 
         IncomingBlock memory incomingBlock = incomingBlocks[height];
 
-        if (incomingBlock.status == IncomingBlockStatus.None) {
-            return;
-        }
+        require(incomingBlock.status == IncomingBlockStatus.Challenged,
+            "SpokeBridge: incoming block has no challenged status!");
 
         if (incomingBlock.transactionRoot == calculatedRoot) {
             // False challenging
             incomingBlock.status = IncomingBlockStatus.Relayed;
-            relayers[incomingBlock.relayer].status = RelayerStatus.Active;
+
+            relayers[incomingBlock.relayer].againstChallenges.decrement();
+
+            if (relayers[incomingBlock.relayer].againstChallenges.current() == 0 &&
+                relayers[incomingBlock.relayer].status == RelayerStatus.Challenged) {
+                // there is no more challenge against the relayer
+                // nobody found that this relayer is malicious
+                relayers[incomingBlock.relayer].status = RelayerStatus.Active;
+            }
+
             challengedIncomingBlocks[height].status = ChallengeStatus.None;
+
+            numberOfChallenges.decrement();
+            if (numberOfChallenges.current() == 0 && status == BridgeStatus.Challenged) {
+                // this is the last challenge in progress
+                // nobody found malicious action
+                status = BridgeStatus.Active;
+            }
         } else {
-            // TODO versioning, after malicious behav
-            // Proved malicious bid(behavior)
+            // True challenging, proved malicious action
             incomingBlock.status = IncomingBlockStatus.Malicious;
+
+            relayers[incomingBlock.relayer].againstChallenges.decrement();
             relayers[incomingBlock.relayer].status = RelayerStatus.Malicious;
+
+            if (status == BridgeStatus.Challenged || firstMaliciousBlockHeight > height) {
+                // This is the first proved malicious block during this dispute period
+                // Or the current height is smaller than previos one
+                firstMaliciousBlockHeight = height;
+            }
+
+            numberOfChallenges.decrement();
+            status = BridgeStatus.Paused;
 
             // Dealing with the challenger
             if (challengedIncomingBlocks[height].status == ChallengeStatus.Challenged) {
-                incomingChallengeRewards[height].challenger = challengedIncomingBlocks[height].challenger;
-                incomingChallengeRewards[height].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 4;
+                incomingChallengeRewards[challengedIncomingBlocks[height].challenger].amount += CHALLENGE_AMOUNT + STAKE_AMOUNT / 4;
+                incomingChallengeRewards[_msgSender()].isClaimed = false;
             }
             challengedIncomingBlocks[height].status = ChallengeStatus.Proved;
         }
     }
 
-    function deposite() public override payable {
+    function deposite() public override payable onlyInActiveStatus {
         require(RelayerStatus.None == relayers[_msgSender()].status, "SpokeBridge: caller cannot be a relayer!");
         require(msg.value == STAKE_AMOUNT, "SpokeBridge: msg.value is not appropriate!");
 
@@ -162,12 +218,12 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         relayers[_msgSender()].stakedAmount = msg.value;
     }
 
-    function undeposite() public override onlyActiveRelayer {
+    function undeposite() public override onlyInActiveStatus onlyActiveRelayer {
         relayers[_msgSender()].status = RelayerStatus.Undeposited;
         relayers[_msgSender()].dateOfUndeposited = block.timestamp;
     }
 
-    function claimDeposite() public override onlyUndepositedRelayer {
+    function claimDeposite() public override onlyInActiveStatus onlyUndepositedRelayer {
         require(block.timestamp > relayers[_msgSender()].dateOfUndeposited + TIME_LIMIT_OF_UNDEPOSIT,
             "SpokeBridge: 2 days is not expired from the undepositing!");
 
@@ -177,33 +233,41 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         relayers[_msgSender()].status = RelayerStatus.None;
     }
 
-    function claimChallengeReward(uint256 _challengeId) public override {
-        require(!incomingChallengeRewards[_challengeId].isClaimed, "SpokeBridge: reward is already claimed!");
-        require(incomingChallengeRewards[_challengeId].challenger == _msgSender(),
-            "SpokeBridge: challenger is not the sender!");
+    function claimChallengeReward(uint256 _challengeId) public override onlyInActiveStatus {
+        require(!incomingChallengeRewards[_msgSender()].isClaimed, "SpokeBridge: reward is already claimed!");
 
-        incomingChallengeRewards[_challengeId].isClaimed = true;
+        incomingChallengeRewards[_msgSender()].isClaimed = true;
 
-        (bool isSent,) = _msgSender().call{value: incomingChallengeRewards[_challengeId].amount}("");
+        (bool isSent,) = _msgSender().call{value: incomingChallengeRewards[_msgSender()].amount}("");
         require(isSent, "Failed to send Ether");
+
+        incomingChallengeRewards[_msgSender()].amount = 0;
     }
 
-    function addIncomingBlock(bytes32 _transactionRoot) public override onlyActiveRelayer {
-        incomingBlocks[incomingBlockId.current()] = IncomingBlock({
+    function addIncomingBlock(bytes32 _transactionRoot) public override onlyInActiveStatus onlyActiveRelayer {
+        incomingBlocks[incomingBlockId] = IncomingBlock({
             transactionRoot:_transactionRoot,
             timestampOfIncoming:block.timestamp,
             status:IncomingBlockStatus.Relayed,
             relayer:_msgSender()
         });
 
-        incomingBlockId.increment();
+        incomingBlockId++;
     }
 
     function challengeIncomingBlock(uint256 _height) public override payable {
         require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");
-        require(incomingBlocks[_height].status == IncomingBlockStatus.Relayed, "SpokeBridge: Corresponding incoming bid status is not relayed!");
-        require(incomingBlocks[_height].timestampOfIncoming + 4 hours > block.timestamp, "SpokeBridge: The dispute period is expired!");
-        require(challengedIncomingBlocks[_height].status == ChallengeStatus.None, "SpokeBridge: bid is already challenged!");
+        require(incomingBlocks[_height].status == IncomingBlockStatus.Relayed,
+            "SpokeBridge: Corresponding incoming bid status is not relayed!");
+        require(incomingBlocks[_height].timestampOfIncoming + 4 hours > block.timestamp,
+            "SpokeBridge: The dispute period is expired!");
+        require(challengedIncomingBlocks[_height].status == ChallengeStatus.None,
+            "SpokeBridge: bid is already challenged!");
+
+        require(status != BridgeStatus.Paused, "SpokeBridge: the status of the bridge is paused!");
+
+        status = BridgeStatus.Challenged;
+        numberOfChallenges.increment();
 
         incomingBlocks[_height].status = IncomingBlockStatus.Challenged;
 
@@ -212,6 +276,20 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
         relayers[incomingBlocks[_height].relayer].status = RelayerStatus.Challenged;
     }
+
+    function restore() public override onlyInPausedStatus {
+        status = BridgeStatus.Active;
+
+        for (uint i = firstMaliciousBlockHeight; i < incomingBlockId; i++) {
+            incomingBlocks[i].status = IncomingBlockStatus.None;
+            challengedIncomingBlocks[i].status = ChallengeStatus.None;
+        }
+
+        // set the next incoming block id
+        incomingBlockId = firstMaliciousBlockHeight - 1;
+        firstMaliciousBlockHeight = 0;
+    }
+
 
     /**
      * Always returns `IERC721Receiver.onERC721Received.selector`.

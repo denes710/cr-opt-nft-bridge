@@ -40,7 +40,7 @@ abstract contract SrcSpokeBridge is SpokeBridge {
         LocalTransaction calldata _transaction,
         bytes32[] calldata _proof,
         uint _index
-    ) public override payable {
+    ) public override payable onlyInActiveStatus {
         IncomingBlock memory incomingBlock = incomingBlocks[_incomingBlockId];
 
         require(msg.value == TRANS_FEE, "SrcSpokeBridge: there is no enough fee for relayers!");

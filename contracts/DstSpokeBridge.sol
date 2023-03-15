@@ -25,8 +25,10 @@ abstract contract DstSpokeBridge is SpokeBridge {
     }
 
     function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) public override {
-        require(IWrappedERC721(_erc721Contract).ownerOf(_tokenId) == _msgSender(), "DstSpokeBridge: owner is not the caller!");
-        require(claimedTokens[_erc721Contract][_tokenId] + 4 hours < block.timestamp, "DesSpokeBridge: challenging time window is not expired yet!");
+        require(IWrappedERC721(_erc721Contract).ownerOf(_tokenId) == _msgSender(),
+            "DstSpokeBridge: owner is not the caller!");
+        require(claimedTokens[_erc721Contract][_tokenId] + 4 hours < block.timestamp,
+            "DesSpokeBridge: challenging time window is not expired yet!");
 
         IWrappedERC721(_erc721Contract).burn(_tokenId);
 
@@ -48,7 +50,7 @@ abstract contract DstSpokeBridge is SpokeBridge {
         LocalTransaction calldata _transaction,
         bytes32[] calldata _proof,
         uint _index
-    ) public override payable {
+    ) public override payable onlyInActiveStatus {
         IncomingBlock memory incomingBlock = incomingBlocks[_incomingBlockId];
 
         require(msg.value == TRANS_FEE, "DstSpokeBridge: there is no enough fee for relayers!");
