@@ -25,11 +25,6 @@ def init_contracts():
         erc721.mint(accounts[1], i, {'from': accounts[0]})
         erc721.approve(srcSpokeBridge.address, i, {'from': accounts[1]})
 
-    # for adding to a block, but it could conflict with the incoming ones
-    for i in range(10, 20):
-        wrappedErc721.mint(accounts[3], i, {'from': accounts[0]})
-        wrappedErc721.approve(wrappedErc721.address, i, {'from': accounts[3]})
-
     wrappedErc721.transferOwnership(dstSpokeBridge.address)
     return srcSpokeBridge, dstSpokeBridge, contractMap, erc721, wrappedErc721
 
@@ -55,26 +50,37 @@ def test_one_token_briging_circle_without_challenge(init_contracts):
     transaction_root = srcSpokeBridge.getRoot()
     dstSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
 
-    proof = [srcSpokeBridge.hashes(0), srcSpokeBridge.hashes(5)]
-    dstSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof, 1, {'from': receiver, 'amount': Wei("0.01 ether")})
+
+    dstSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
+
+    proof_1 = [srcSpokeBridge.hashes(1), srcSpokeBridge.hashes(5)]
+    dstSpokeBridge.claimNFT(0, [1, user, receiver, erc721.address, wrappedErc721.address], proof_1, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
+
+    proof_2 = [srcSpokeBridge.hashes(0), srcSpokeBridge.hashes(5)]
+    dstSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof_2, 1, {'from': receiver, 'amount': Wei("0.01 ether")})
+
+    proof_3 = [srcSpokeBridge.hashes(3), srcSpokeBridge.hashes(4)]
+    dstSpokeBridge.claimNFT(0, [3, user, receiver, erc721.address, wrappedErc721.address], proof_3, 2, {'from': receiver, 'amount': Wei("0.01 ether")})
+
+    proof_4 = [srcSpokeBridge.hashes(2), srcSpokeBridge.hashes(4)]
+    dstSpokeBridge.claimNFT(0, [4, user, receiver, erc721.address, wrappedErc721.address], proof_4, 3, {'from': receiver, 'amount': Wei("0.01 ether")})
 
     chain.sleep(14400000) # it's 4 hours
 
-    wrappedErc721.approve(dstSpokeBridge.address, 2, {'from': receiver})
-    dstSpokeBridge.addNewTransactionToBlock(user, 2, wrappedErc721.address, {'from': receiver})
-
-    for i in range(10, 15):
-        wrappedErc721.approve(dstSpokeBridge.address, i, {'from': receiver})
-        dstSpokeBridge.addNewTransactionToBlock(user, i, wrappedErc721.address, {'from': receiver})
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [1, user, receiver, erc721.address, wrappedErc721.address], proof_1, 0, {'from': receiver})
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [2, user, receiver, erc721.address, wrappedErc721.address], proof_2, 1, {'from': receiver})
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [3, user, receiver, erc721.address, wrappedErc721.address], proof_3, 2, {'from': receiver})
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [4, user, receiver, erc721.address, wrappedErc721.address], proof_4, 3, {'from': receiver})
 
     dstSpokeBridge.calculateTransactionHashes(0)
     transaction_root = dstSpokeBridge.getRoot()
+
     srcSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
 
     chain.sleep(14400000) # it's 4 hours
 
     proof = [dstSpokeBridge.hashes(1), dstSpokeBridge.hashes(5)]
-    srcSpokeBridge.claimNFT(0, [2, receiver, user, null_address, wrappedErc721.address], proof, 0, {'from': user, 'amount': Wei("0.01 ether")})
+    srcSpokeBridge.claimNFT(0, [1, receiver, user, erc721.address, wrappedErc721.address], proof, 0, {'from': user, 'amount': Wei("0.01 ether")})
 
 def test_challenge_on_dst_side_then_restore(init_contracts):
     srcSpokeBridge, dstSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
@@ -197,26 +203,24 @@ def test_challenge_on_src_side_then_restore(init_contracts):
 
     dstSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
 
-    # proof for id 1
-    proof = [srcSpokeBridge.hashes(1), srcSpokeBridge.hashes(5)]
-    dstSpokeBridge.claimNFT(0, [1, user, receiver, erc721.address, wrappedErc721.address], proof, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
+    proof_1 = [srcSpokeBridge.hashes(1), srcSpokeBridge.hashes(5)]
+    dstSpokeBridge.claimNFT(0, [1, user, receiver, erc721.address, wrappedErc721.address], proof_1, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
 
-    # 0 block
-    for i in range(10, 14):
-        dstSpokeBridge.addNewTransactionToBlock(user, i, wrappedErc721.address, {'from': receiver})
+    proof_2 = [srcSpokeBridge.hashes(0), srcSpokeBridge.hashes(5)]
+    dstSpokeBridge.claimNFT(0, [2, user, receiver, erc721.address, wrappedErc721.address], proof_2, 1, {'from': receiver, 'amount': Wei("0.01 ether")})
 
-    # 1 block
-    wrappedErc721.approve(wrappedErc721.address, 1, {'from': receiver})
+    proof_3 = [srcSpokeBridge.hashes(3), srcSpokeBridge.hashes(4)]
+    dstSpokeBridge.claimNFT(0, [3, user, receiver, erc721.address, wrappedErc721.address], proof_3, 2, {'from': receiver, 'amount': Wei("0.01 ether")})
+
+    proof_4 = [srcSpokeBridge.hashes(2), srcSpokeBridge.hashes(4)]
+    dstSpokeBridge.claimNFT(0, [4, user, receiver, erc721.address, wrappedErc721.address], proof_4, 3, {'from': receiver, 'amount': Wei("0.01 ether")})
 
     chain.sleep(14400000) # it's 4 hours
 
-    dstSpokeBridge.addNewTransactionToBlock(user, 1, wrappedErc721.address, {'from': receiver})
-    for i in range(14, 19):
-        dstSpokeBridge.addNewTransactionToBlock(user, i, wrappedErc721.address, {'from': receiver})
-
-    # calculate a valid root for block 1 on dst
-    dstSpokeBridge.calculateTransactionHashes(1)
-    transaction_root = dstSpokeBridge.getRoot()
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [1, user, receiver, erc721.address, wrappedErc721.address], proof_1, 0, {'from': receiver})
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [2, user, receiver, erc721.address, wrappedErc721.address], proof_2, 1, {'from': receiver})
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [3, user, receiver, erc721.address, wrappedErc721.address], proof_3, 2, {'from': receiver})
+    dstSpokeBridge.addNewTransactionToBlock(user, 0, [4, user, receiver, erc721.address, wrappedErc721.address], proof_4, 3, {'from': receiver})
 
     # wrong relaying
     srcSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
@@ -259,18 +263,11 @@ def test_challenge_on_src_side_then_restore(init_contracts):
         srcSpokeBridge.addIncomingBlock(transaction_root, {'from': relayer})
     srcSpokeBridge.addIncomingBlock(transaction_root, {'from': new_relayer})
 
-    # block 1
-    # calculate a valid root for block 1 on src
-    dstSpokeBridge.calculateTransactionHashes(1)
-    transaction_root = dstSpokeBridge.getRoot()
-
-    srcSpokeBridge.addIncomingBlock(transaction_root, {'from': new_relayer})
-
     chain.sleep(14400000) # it's 4 hours
 
     # proof for id 1
     proof = [dstSpokeBridge.hashes(1), dstSpokeBridge.hashes(5)]
-    srcSpokeBridge.claimNFT(1, [1, receiver, user, null_address, wrappedErc721.address], proof, 0, {'from': user, 'amount': Wei("0.01 ether")})
+    srcSpokeBridge.claimNFT(0, [1, receiver, user, erc721.address, wrappedErc721.address], proof, 0, {'from': user, 'amount': Wei("0.01 ether")})
 
     assert srcSpokeBridge.relayers(relayer)["status"] == 4
 

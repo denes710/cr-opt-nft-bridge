@@ -27,7 +27,7 @@ abstract contract SrcSpokeBridge is SpokeBridge {
         contractMap = _contractMap;
     }
 
-    function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) public override {
+    function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) public {
         IERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 
         localBlocks[localBlockId.current()].transactions.push(LibLocalTransaction.LocalTransaction({

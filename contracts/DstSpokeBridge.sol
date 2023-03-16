@@ -21,8 +21,6 @@ abstract contract DstSpokeBridge is SpokeBridge {
         bool isClaimed;
     }
 
-    mapping(address => mapping(uint256 => uint256)) claimedTokens;
-
     constructor(
         address _hub,
         uint256 _transferPerBlock,
@@ -30,21 +28,28 @@ abstract contract DstSpokeBridge is SpokeBridge {
     ) SpokeBridge(_hub, _transferPerBlock, _transFee) {
     }
 
-    // FIXME make it similar to the claiming
-    function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) public override {
-        require(IWrappedERC721(_erc721Contract).ownerOf(_tokenId) == _msgSender(),
+    function addNewTransactionToBlock(
+        address _newReceiver,
+        uint256 _incomingBlockId,
+        LibLocalTransaction.LocalTransaction calldata _transaction,
+        bytes32[] calldata _proof,
+        uint _index
+    ) public {
+        require(_verifyMerkleProof(_proof, incomingBlocks[_incomingBlockId].transactionRoot, _transaction, _index),
+            "DstSpokeBridge: proof is not correct unwrapping!");
+        require(IWrappedERC721(_transaction.remoteErc721Contract).ownerOf(_transaction.tokenId) == _msgSender(),
             "DstSpokeBridge: owner is not the caller!");
-        require(claimedTokens[_erc721Contract][_tokenId] + 4 hours < block.timestamp,
+        require(incomingBlocks[_incomingBlockId].timestampOfIncoming + 4 hours < block.timestamp,
             "DesSpokeBridge: challenging time window is not expired yet!");
 
-        IWrappedERC721(_erc721Contract).burn(_tokenId);
+        IWrappedERC721(_transaction.remoteErc721Contract).burn(_transaction.tokenId);
 
         localBlocks[localBlockId.current()].transactions.push(LibLocalTransaction.LocalTransaction({
-            tokenId:_tokenId,
+            tokenId:_transaction.tokenId,
             maker:_msgSender(),
-            receiver:_receiver,
-            localErc721Contract:address(0), // it is not used
-            remoteErc721Contract:_erc721Contract
+            receiver:_newReceiver,
+            localErc721Contract:_transaction.localErc721Contract, // it is not used / maybe?
+            remoteErc721Contract:_transaction.remoteErc721Contract
         }));
 
         if (localBlocks[localBlockId.current()].transactions.length == TRANS_PER_BLOCK) {
@@ -63,7 +68,7 @@ abstract contract DstSpokeBridge is SpokeBridge {
         require(msg.value == TRANS_FEE, "DstSpokeBridge: there is no enough fee for relayers!");
 
         require(incomingBlock.status == IncomingBlockStatus.Relayed,
-            "DstSpokeBride: incoming block has no Relayed state!");
+            "DstSpokeBridge: incoming block has no Relayed state!");
 
         // there is no timestamp check only druing adding to the block
 
@@ -75,8 +80,6 @@ abstract contract DstSpokeBridge is SpokeBridge {
 
         require(_transaction.receiver == _msgSender(),
             "DstSpokeBridge: receiver is not the message sender!");
-
-        claimedTokens[_transaction.remoteErc721Contract][_transaction.tokenId] = block.timestamp;
 
         (bool isSent,) = incomingBlock.relayer.call{value: TRANS_FEE}("");
         require(isSent, "Failed to send Ether");

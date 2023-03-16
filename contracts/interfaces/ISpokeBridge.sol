@@ -32,8 +32,6 @@ interface ISpokeBridge is IERC721Receiver {
 
     function claimChallengeReward() external;
 
-    function addNewTransactionToBlock(address _receiver, uint256 _tokenId, address _erc721Contract) external;
-
     function addIncomingBlock(bytes32 _transactionRoot) external;
 
     function challengeIncomingBlock(uint256 _height) external payable;
