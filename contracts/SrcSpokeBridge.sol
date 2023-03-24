@@ -38,6 +38,15 @@ abstract contract SrcSpokeBridge is SpokeBridge {
             remoteErc721Contract:IContractMap(contractMap).getRemote(_erc721Contract)
         }));
 
+        emit NewTransactionAddedToBlock(
+            localBlockId.current(),
+            _tokenId,
+            _msgSender(),
+            _receiver,
+            _erc721Contract,
+           IContractMap(contractMap).getRemote(_erc721Contract)
+        );
+
         if (localBlocks[localBlockId.current()].transactions.length == TRANS_PER_BLOCK) {
             localBlockId.increment();
         }
@@ -80,5 +89,7 @@ abstract contract SrcSpokeBridge is SpokeBridge {
 
         IERC721(IContractMap(contractMap).getLocal(_transaction.remoteErc721Contract))
             .safeTransferFrom(address(this), _transaction.receiver, _transaction.tokenId);
+
+        emit NFTClaimed(_incomingBlockId, _transaction.remoteErc721Contract, _transaction.receiver,  _transaction.tokenId);
     }
 }

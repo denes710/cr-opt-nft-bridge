@@ -22,6 +22,8 @@ contract ContractMap is IContractMap, Ownable {
 
         localToRemote[_local] = _remote;
         remoteToLocal[_remote] = _local;
+
+        emit PairAdded(_local, _remote);
     }
 
     function getRemote(address _local) public view override returns (address) {

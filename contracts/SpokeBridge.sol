@@ -155,6 +155,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
             bytes32(0) : _getMerkleRoot(localBlocks[_height].transactions);
         bytes memory data = abi.encode(_height, calculatedRoot);
         _sendMessage(data);
+        emit ProofSent(_height);
     }
 
     function receiveProof(bytes memory _root) public override onlyHub {
@@ -188,6 +189,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
                 // nobody found malicious action
                 status = BridgeStatus.Active;
             }
+
+            emit ProofReceived(height, false);
         } else {
             // True challenging, proved malicious action
             incomingBlock.status = IncomingBlockStatus.Malicious;
@@ -210,6 +213,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
                 incomingChallengeRewards[_msgSender()].isClaimed = false;
             }
             challengedIncomingBlocks[height].status = ChallengeStatus.Proved;
+
+            emit ProofReceived(height, true);
         }
     }
 
@@ -257,6 +262,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         });
 
         incomingBlockId++;
+
+        emit IncomingBlockAdded(_transactionRoot, incomingBlockId - 1);
     }
 
     function challengeIncomingBlock(uint256 _height) public override payable {
@@ -280,6 +287,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
         relayers[incomingBlocks[_height].relayer].againstChallenges.increment();
         relayers[incomingBlocks[_height].relayer].status = RelayerStatus.Challenged;
+
+        emit IncomingBlockChallenged(incomingBlocks[_height].transactionRoot, _height);
     }
 
     function restore() public override onlyInPausedStatus {
@@ -291,13 +300,10 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         }
 
         // set the next incoming block id
-        if (firstMaliciousBlockHeight != 0) {
-            incomingBlockId = firstMaliciousBlockHeight - 1;
-        } else {
-            incomingBlockId = 0;
-        }
+        incomingBlockId = firstMaliciousBlockHeight;
 
         firstMaliciousBlockHeight = 0;
+        emit Restored(incomingBlockId);
     }
 
     function getLocalTransaction(

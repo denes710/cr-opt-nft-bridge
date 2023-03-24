@@ -9,16 +9,27 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
  * @notice This interface will send and receive messages.
  */
 interface ISpokeBridge is IERC721Receiver {
-    // FIXME defines and uses these events
-    event BidCreated();
+    event ProofSent(uint256 _height);
 
-    event BidBought(address relayer, uint256 bidId);
+    event ProofReceived(uint256 _height, bool _isSuccessfulChallenge);
 
-    event BidChallenged(address challenger, address relayer, uint256 bidId);
+    // current block id which is not finalized
+    event Restored(uint256 _currentBlockId);
 
-    event ProofSent();
+    event NewTransactionAddedToBlock(
+        uint256 _blockId,
+        uint256 _tokenId,
+        address _maker,
+        address _receiver,
+        address _localERC721,
+        address _remoteERC721
+    );
 
-    event NFTUnwrapped(address contractAddress, uint256 bidId, uint256 id, address owner);
+    event NFTClaimed(uint256 _incomingBlockId, address _localERC721, address _receiver, uint256 _tokenId);
+
+    event IncomingBlockAdded(bytes32 _transactionRoot, uint256 _blockId);
+
+    event IncomingBlockChallenged(bytes32 _transactionRoot, uint256 _blockId);
 
     function sendProof(uint256 _height) external;
 

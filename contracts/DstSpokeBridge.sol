@@ -33,7 +33,7 @@ abstract contract DstSpokeBridge is SpokeBridge {
         uint256 _incomingBlockId,
         LibLocalTransaction.LocalTransaction calldata _transaction,
         bytes32[] calldata _proof,
-        uint _index
+        uint256 _index
     ) public {
         require(_verifyMerkleProof(_proof, incomingBlocks[_incomingBlockId].transactionRoot, _transaction, _index),
             "DstSpokeBridge: proof is not correct unwrapping!");
@@ -51,6 +51,15 @@ abstract contract DstSpokeBridge is SpokeBridge {
             localErc721Contract:_transaction.localErc721Contract, // it is not used / maybe?
             remoteErc721Contract:_transaction.remoteErc721Contract
         }));
+
+        emit NewTransactionAddedToBlock(
+            localBlockId.current(),
+            _transaction.tokenId,
+            _msgSender(),
+            _newReceiver,
+            _transaction.localErc721Contract,
+            _transaction.remoteErc721Contract
+        );
 
         if (localBlocks[localBlockId.current()].transactions.length == TRANS_PER_BLOCK) {
             localBlockId.increment();
@@ -89,6 +98,8 @@ abstract contract DstSpokeBridge is SpokeBridge {
         }
 
         IWrappedERC721(_transaction.remoteErc721Contract).mint(_transaction.receiver, _transaction.tokenId);
+
+        emit NFTClaimed(_incomingBlockId, _transaction.remoteErc721Contract, _transaction.receiver,  _transaction.tokenId);
     }
 
     function _isMinted(address _contract, uint256 _tokenId) internal view returns (address) {
