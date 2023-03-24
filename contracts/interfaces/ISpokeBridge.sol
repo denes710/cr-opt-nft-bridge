@@ -18,6 +18,7 @@ interface ISpokeBridge is IERC721Receiver {
 
     event NewTransactionAddedToBlock(
         uint256 _blockId,
+        uint256 _TxId,
         uint256 _tokenId,
         address _maker,
         address _receiver,
@@ -56,5 +57,5 @@ interface ISpokeBridge is IERC721Receiver {
 
     function restore() external;
 
-    function getLocalTransaction(uint256 _blockNum, uint256 _txIdx) external view returns (LibLocalTransaction.LocalTransaction memory);
+    function getLocalTransaction(uint256 _blockNum, uint256 _txIdx) external view returns (bytes32);
 }

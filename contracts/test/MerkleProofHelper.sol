@@ -6,16 +6,10 @@ import {LibLocalTransaction} from "../libraries/LibLocalTransaction.sol";
 contract MerkleProofHelper  {
     bytes32[] public hashes;
 
-    function calculateHashes(LibLocalTransaction.LocalTransaction[] memory _transactions) public {
+    function calculateHashes(bytes32[] memory _transactions) public {
         delete hashes;
         for (uint i = 0; i < _transactions.length; i++) {
-            hashes.push(keccak256(abi.encode(
-                _transactions[i].tokenId,
-                _transactions[i].maker,
-                _transactions[i].receiver,
-                _transactions[i].localErc721Contract,
-                _transactions[i].remoteErc721Contract
-            )));
+            hashes.push(_transactions[i]);
         }
 
         uint n = _transactions.length;

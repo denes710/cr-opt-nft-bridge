@@ -44,16 +44,16 @@ abstract contract DstSpokeBridge is SpokeBridge {
 
         IWrappedERC721(_transaction.remoteErc721Contract).burn(_transaction.tokenId);
 
-        localBlocks[localBlockId.current()].transactions.push(LibLocalTransaction.LocalTransaction({
-            tokenId:_transaction.tokenId,
-            maker:_msgSender(),
-            receiver:_newReceiver,
-            localErc721Contract:_transaction.localErc721Contract, // it is not used / maybe?
-            remoteErc721Contract:_transaction.remoteErc721Contract
-        }));
+        uint256 currentTxId = localBlocks[localBlockId.current()].length.current();
+
+        localBlocks[localBlockId.current()].transactions[currentTxId] = 
+            keccak256(abi.encode(_transaction.tokenId, _msgSender(), _newReceiver, _transaction.localErc721Contract, _transaction.remoteErc721Contract));
+
+        localBlocks[localBlockId.current()].length.increment();
 
         emit NewTransactionAddedToBlock(
             localBlockId.current(),
+            currentTxId,
             _transaction.tokenId,
             _msgSender(),
             _newReceiver,
@@ -61,7 +61,7 @@ abstract contract DstSpokeBridge is SpokeBridge {
             _transaction.remoteErc721Contract
         );
 
-        if (localBlocks[localBlockId.current()].transactions.length == TRANS_PER_BLOCK) {
+        if (currentTxId + 1 == TRANS_PER_BLOCK) {
             localBlockId.increment();
         }
     }

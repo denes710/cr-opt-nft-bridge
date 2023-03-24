@@ -7,7 +7,13 @@ import {MerkleProofHelper} from "./MerkleProofHelper.sol";
 
 import {DstSpokeBridge} from "../DstSpokeBridge.sol";
 
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
+import {LibLocalTransaction} from "./../libraries/LibLocalTransaction.sol";
+
 contract SimpleGatewayDstSpokeBrdige is DstSpokeBridge, MerkleProofHelper {
+    using LibLocalTransaction for LibLocalTransaction.LocalBlock;
+    using Counters for Counters.Counter;
+
     constructor(
         address _hub,
         uint256 _transferPerBlock,
@@ -16,7 +22,12 @@ contract SimpleGatewayDstSpokeBrdige is DstSpokeBridge, MerkleProofHelper {
     }
 
     function calculateTransactionHashes(uint256 blockId) public {
-        super.calculateHashes(localBlocks[blockId].transactions);
+        bytes32[] memory input = new bytes32[](localBlocks[blockId].length.current());
+        for (uint i = 0; i < localBlocks[blockId].length.current(); i++) {
+            input[i] = localBlocks[blockId].transactions[i];
+        }
+
+        super.calculateHashes(input);
     }
 
     function _sendMessage(bytes memory _data) internal override {
