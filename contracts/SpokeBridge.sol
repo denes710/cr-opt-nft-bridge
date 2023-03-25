@@ -3,6 +3,8 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import {ISpokeBridge} from "./interfaces/ISpokeBridge.sol";
 
+import {LibBid} from "./libraries/LibBid.sol";
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
@@ -12,6 +14,7 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
  */
 abstract contract SpokeBridge is ISpokeBridge, Ownable {
     using Counters for Counters.Counter;
+    using LibBid for LibBid.Transaction;
 
     // FIXME outgoing and incoming bid are different a little bit on dst and src sides
     enum OutgoingBidStatus {
@@ -33,28 +36,17 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     struct OutgoingBid {
         OutgoingBidStatus status;
-        uint256 fee;
-        // the original owner
-        address maker;
-        // the new owner
-        address receiver;
-        uint256 tokenId;
-        address localErc721Contract;
-        address remoteErc721Contract; // it is not relevant on the dst side
         uint256 timestampOfBought;
-        // the relayer
-        address buyer;
+        uint256 fee;
+        address relayer;
+        bytes32 hashedTransaction;
     }
 
     struct IncomingBid {
-        uint256 outgoingId; // it is not relevant on the dst side
         IncomingBidStatus status;
-        address receiver;
-        uint256 tokenId;
-        // it is always an address on the dst chain
-        address remoteErc721Contract; // it is not relevant on the src side
         uint256 timestampOfRelayed;
         address relayer;
+        bytes32 hashedTransaction;
     }
 
     enum RelayerStatus {
@@ -142,7 +134,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         require(outgoingBids[_bidId].status == OutgoingBidStatus.Created,
             "SpokeBridge: bid does not have Created state");
         outgoingBids[_bidId].status = OutgoingBidStatus.Bought;
-        outgoingBids[_bidId].buyer = _msgSender();
+        outgoingBids[_bidId].relayer = _msgSender();
         outgoingBids[_bidId].timestampOfBought = block.timestamp;
 
         (bool isSent,) = _msgSender().call{value: outgoingBids[_bidId].fee}("");
@@ -194,18 +186,8 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         }
     }
 
-    /**
-     * Always returns `IERC721Receiver.onERC721Received.selector`.
-     */
-    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
-
-    function _sendMessage(bytes memory _data) internal virtual;
-
-    function _getCrossMessageSender() internal virtual returns (address);
-
-    function _challengeUnlocking(uint256 _bidId) internal {
+    // FIXME restore function
+    function challengeIncomingBid(uint256 _bidId) public payable override {
         require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");
         require(incomingBids[_bidId].status == IncomingBidStatus.Relayed, "SpokeBridge: Corresponding incoming bid status is not relayed!");
         require(incomingBids[_bidId].timestampOfRelayed + 4 hours > block.timestamp, "SpokeBridge: The dispute period is expired!");
@@ -218,4 +200,118 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
         relayers[incomingBids[_bidId].relayer].status = RelayerStatus.Challenged;
     }
+
+    function receiveProof(bytes memory _proof) public override onlyHub {
+        (bytes memory bidBytes, bool isBidOutgoing) = abi.decode(_proof, (bytes, bool));
+        if (isBidOutgoing) {
+            // On the source chain during unlocking(wrong relaying), revert the incoming messsage
+            (
+                uint256 bidId,
+                bytes32 hashedTransaction,
+                address relayer,
+                OutgoingBidStatus status
+            ) = abi.decode(bidBytes, (uint256, bytes32, address, OutgoingBidStatus));
+
+            IncomingBid memory localChallengedBid = incomingBids[bidId];
+
+            require(localChallengedBid.status != IncomingBidStatus.None, "SpokeBrdige: There is no corresponding local bid!");
+            require(localChallengedBid.timestampOfRelayed + 4 hours > block.timestamp, "SpokeBridge: Time window is expired!");
+
+            if (incomingBids[bidId].hashedTransaction == hashedTransaction &&
+                incomingBids[bidId].relayer == relayer) {
+                // False challenging
+                localChallengedBid.status = IncomingBidStatus.Relayed;
+                relayers[localChallengedBid.relayer].status = RelayerStatus.Active;
+                challengedIncomingBids[bidId].status = ChallengeStatus.None;
+            } else {
+                // Proved malicious bid(behavior)
+                localChallengedBid.status = IncomingBidStatus.Malicious;
+                relayers[localChallengedBid.relayer].status = RelayerStatus.Malicious;
+
+                // Dealing with the challenger
+                if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
+                    incomingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
+                    incomingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 4;
+                }
+                challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
+            }
+        } else {
+            // On the source chain during locking(no relaying), revert locking
+            (
+                uint256 bidId,
+                bytes32 hashedTransaction,
+                address relayer,
+                IncomingBidStatus status,
+                address challenger
+            ) = abi.decode(bidBytes, (uint256, bytes32, address, IncomingBidStatus, address));
+
+            OutgoingBid memory localChallengedBid = outgoingBids[bidId];
+
+            require(localChallengedBid.status != OutgoingBidStatus.None, "SpokeBrdige: There is no corresponding local bid!");
+            require(localChallengedBid.timestampOfBought + 4 hours < block.timestamp, "SpokeBridge: Time window is not expired!");
+
+            if (localChallengedBid.hashedTransaction == hashedTransaction &&
+                localChallengedBid.relayer == relayer) {
+                // False challenging
+                require(false, "SpokeBridge: False challenging!");
+
+            } else {
+                // Proved malicious bid - no relaying
+                localChallengedBid.status = OutgoingBidStatus.Malicious;
+                relayers[localChallengedBid.relayer].status = RelayerStatus.Malicious;
+
+                outgoingChallengeRewards[bidId].challenger = challenger;
+                outgoingChallengeRewards[bidId].amount = STAKE_AMOUNT / 4;
+
+                challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
+            }
+        }
+    }
+
+    function sendProof(bool _isOutgoingBid, uint256 _bidId) public override {
+        if (_isOutgoingBid) {
+            OutgoingBid memory bid = outgoingBids[_bidId];
+            bytes memory data = abi.encode(
+                _bidId,
+                bid.hashedTransaction,
+                bid.relayer,
+                bid.status
+            );
+
+            data = abi.encode(data, true);
+
+            _sendMessage(data);
+        } else {
+            require(incomingBids[_bidId].timestampOfRelayed + 4 hours < block.timestamp,
+                "SpokeBridge: too early to send proof!");
+
+            IncomingBid memory bid = incomingBids[_bidId];
+            bytes memory data = abi.encode(
+                _bidId,
+                bid.hashedTransaction,
+                bid.relayer,
+                bid.status,
+                _msgSender()
+            );
+
+            data = abi.encode(data, false);
+
+            _sendMessage(data);
+        }
+    }
+
+    /**
+     * Always returns `IERC721Receiver.onERC721Received.selector`.
+     */
+    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
+    function getTransactionHash(LibBid.Transaction calldata _transaction) public view returns(bytes32) {
+        return keccak256(abi.encode(_transaction.tokenId, _transaction.owner, _transaction.receiver, _transaction.localErc721Contract, _transaction.remoteErc721Contract));
+    }
+
+    function _sendMessage(bytes memory _data) internal virtual;
+
+    function _getCrossMessageSender() internal virtual returns (address);
 }

@@ -69,10 +69,12 @@ def test_user_creating_bid(init_contracts):
 
     srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user, 'amount': Wei("0.01 ether")})
 
+    transaction = [1, user, receiver, erc721.address, wrappedErc721.address]
+    transactionHash = srcSpokeBridge.getTransactionHash(transaction)
+
     retBid = srcSpokeBridge.outgoingBids(0)
     assert retBid["status"] == 1
-    assert retBid["receiver"] == receiver
-    assert retBid["tokenId"] == 1
+    assert retBid["hashedTransaction"] == transactionHash
 
 def test_relayer_buying_bid(init_contracts):
     srcSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
@@ -98,7 +100,7 @@ def test_relayer_buying_bid(init_contracts):
 
     retBid = srcSpokeBridge.outgoingBids(0)
     assert retBid["status"] == 2
-    assert retBid["buyer"] == relayer
+    assert retBid["relayer"] == relayer
 
 def test_relayer_relaying(init_contracts):
     srcSpokeBridge, contractMap, erc721, wrappedErc721 = init_contracts
@@ -113,24 +115,22 @@ def test_relayer_relaying(init_contracts):
     srcSpokeBridge.createBid(receiver, 1, erc721.address, {'from': user, 'amount': Wei("0.01 ether")})
     srcSpokeBridge.buyBid(0, {'from': relayer})
 
-    with reverts("SrcSpokeBridge: the challenging period is not expired yet!"):
-        srcSpokeBridge.unlocking(0, 0, user, {'from': relayer});
+    transaction = [1, user, receiver, erc721.address, wrappedErc721.address]
+    transactionHash = srcSpokeBridge.getTransactionHash(transaction)
 
     chain.sleep(14400000) # it's 4 hours
 
     with reverts("SpokeBridge: caller is not a relayer!"):
-        srcSpokeBridge.unlocking(0, 0, user, {'from': person})
+        srcSpokeBridge.addIncomingBid(0, transactionHash, transaction, {'from': person});
 
-    srcSpokeBridge.unlocking(0, 0, user, {'from': relayer})
+    srcSpokeBridge.addIncomingBid(0, transactionHash, transaction, {'from': relayer});
 
-    with reverts("SrcSpokeBridge: the outgoing bid is not bought!"):
-        srcSpokeBridge.unlocking(0, 0, user, {'from': relayer})
+    with reverts("SrcSpokeBridge: there is an incoming bid with the same id!"):
+        srcSpokeBridge.addIncomingBid(0, transactionHash, transaction, {'from': relayer});
 
     retBid = srcSpokeBridge.incomingBids(0)
     assert retBid["status"] == 1
-    assert retBid["tokenId"] == 1
-    assert retBid["remoteErc721Contract"] == contractMap.getLocal(wrappedErc721.address)
-    assert retBid["receiver"] == user
+    assert retBid["hashedTransaction"] == transactionHash
     assert retBid["relayer"] == relayer
 
 def test_user_claiming_nft(init_contracts):
@@ -148,17 +148,20 @@ def test_user_claiming_nft(init_contracts):
 
     chain.sleep(14400000) # it's 4 hours
 
-    srcSpokeBridge.unlocking(0, 0, user, {'from': relayer})
+    transaction = [1, receiver, user, erc721.address, wrappedErc721.address]
+    transactionHash = srcSpokeBridge.getTransactionHash(transaction)
+
+    srcSpokeBridge.addIncomingBid(0, transactionHash, transaction, {'from': relayer});
 
     with reverts("SrcSpokeBride: incoming bid has no Relayed state!"):
-        srcSpokeBridge.claimNFT(1, {'from': user})
+        srcSpokeBridge.claimNFT(1, transaction, {'from': user})
     with reverts("SrcSpokeBridge: the challenging period is not expired yet!"):
-        srcSpokeBridge.claimNFT(0, {'from': user})
+        srcSpokeBridge.claimNFT(0, transaction, {'from': user})
 
     chain.sleep(14400000) # it's 4 hours
 
     with reverts("SrcSpokeBridge: claimer is not the owner!"):
-        srcSpokeBridge.claimNFT(0, {'from': relayer})
+        srcSpokeBridge.claimNFT(0, transaction, {'from': relayer})
 
-    srcSpokeBridge.claimNFT(0, {'from': user})
+    srcSpokeBridge.claimNFT(0, transaction, {'from': user})
     assert erc721.ownerOf(1) == user

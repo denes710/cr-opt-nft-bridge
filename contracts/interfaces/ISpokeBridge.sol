@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
+import {LibBid} from "../libraries/LibBid.sol";
+
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 /**
@@ -19,6 +21,10 @@ interface ISpokeBridge is IERC721Receiver {
     event NFTUnwrapped(address contractAddress, uint256 bidId, uint256 id, address owner);
 
     function buyBid(uint256 _bidId) external;
+
+    function addIncomingBid(uint256 _bidId, bytes32 _hashedTransaction, LibBid.Transaction calldata _transaction) external;
+
+    function challengeIncomingBid(uint256 _bidId) external payable;
 
     function sendProof(bool _isOutgoingBid, uint256 _bidId) external;
 

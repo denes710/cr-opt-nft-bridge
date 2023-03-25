@@ -6,11 +6,14 @@ import {ISrcSpokeBridge} from "./interfaces/ISrcSpokeBridge.sol";
 
 import {SpokeBridge} from "./SpokeBridge.sol";
 
+import {LibBid} from "./libraries/LibBid.sol";
+
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 
 abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
     using Counters for Counters.Counter;
+    using LibBid for LibBid.Transaction;
 
     address public contractMap;
 
@@ -26,180 +29,43 @@ abstract contract SrcSpokeBridge is ISrcSpokeBridge, SpokeBridge {
 
         IERC721(_erc721Contract).safeTransferFrom(msg.sender, address(this), _tokenId);
 
-        outgoingBids[id.current()] = OutgoingBid({
-            status:OutgoingBidStatus.Created,
-            fee:msg.value,
-            maker:_msgSender(),
-            receiver:_receiver,
-            tokenId:_tokenId,
-            localErc721Contract:_erc721Contract,
-            remoteErc721Contract:IContractMap(contractMap).getRemote(_erc721Contract),
-            timestampOfBought:0,
-            buyer:address(0)
-        });
+        outgoingBids[id.current()].status = OutgoingBidStatus.Created;
+        outgoingBids[id.current()].fee = msg.value;
+        outgoingBids[id.current()].hashedTransaction = keccak256(abi.encode(_tokenId, _msgSender(), _receiver, _erc721Contract, IContractMap(contractMap).getRemote(_erc721Contract)));
 
         id.increment();
     }
 
-    function challengeUnlocking(uint256 _bidId) public override payable {
-        super._challengeUnlocking(_bidId);
-    }
-
-    function sendProof(bool _isOutgoingBid, uint256 _bidId) public override {
-        if (_isOutgoingBid) {
-            OutgoingBid memory bid = outgoingBids[_bidId];
-            bytes memory data = abi.encode(
-                _bidId,
-                bid.status,
-                bid.receiver,
-                bid.tokenId,
-                bid.remoteErc721Contract,
-                bid.buyer
-            );
-
-            data = abi.encode(data, true);
-
-            _sendMessage(data);
-        } else {
-            require(incomingBids[_bidId].timestampOfRelayed + 4 hours < block.timestamp,
-                "SrcSpokeBridge: too early to send proof!");
-
-            IncomingBid memory bid = incomingBids[_bidId];
-            bytes memory data = abi.encode(
-                _bidId,
-                bid.status,
-                bid.receiver,
-                bid.tokenId,
-                outgoingBids[bid.outgoingId].remoteErc721Contract,
-                bid.relayer,
-                _msgSender()
-            );
-
-            data = abi.encode(data, false);
-
-            _sendMessage(data);
-        }
-    }
-
-    function receiveProof(bytes memory _proof) public override onlyHub {
-        (bytes memory bidBytes, bool isBidOutgoing) = abi.decode(_proof, (bytes, bool));
-        if (isBidOutgoing) {
-            // On the source chain during unlocking(wrong relaying), revert the incoming messsage
-            (
-                uint256 bidId,
-                OutgoingBidStatus status, // FIXME maybe it is not useful
-                address receiver,
-                uint256 tokenId,
-                address remoteContract,
-                address relayer
-            ) = abi.decode(bidBytes, (uint256, OutgoingBidStatus, address, uint256, address, address));
-
-            IncomingBid memory localChallengedBid = incomingBids[bidId];
-
-            require(localChallengedBid.status != IncomingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
-            require(localChallengedBid.timestampOfRelayed + 4 hours > block.timestamp, "SrcSpokeBridge: Time window is expired!");
-
-            if (status == OutgoingBidStatus.Bought  &&
-                localChallengedBid.receiver == receiver &&
-                localChallengedBid.tokenId == tokenId &&
-                localChallengedBid.remoteErc721Contract == remoteContract &&
-                localChallengedBid.relayer == relayer) {
-                // False challenging
-                localChallengedBid.status = IncomingBidStatus.Relayed;
-                relayers[localChallengedBid.relayer].status = RelayerStatus.Active;
-                challengedIncomingBids[bidId].status = ChallengeStatus.None;
-            } else {
-                // Proved malicious bid(behavior)
-                localChallengedBid.status = IncomingBidStatus.Malicious;
-                relayers[localChallengedBid.relayer].status = RelayerStatus.Malicious;
-
-                outgoingBids[localChallengedBid.outgoingId].status = OutgoingBidStatus.Bought;
-
-                // Dealing with the challenger
-                if (challengedIncomingBids[bidId].status == ChallengeStatus.Challenged) {
-                    incomingChallengeRewards[bidId].challenger = challengedIncomingBids[bidId].challenger;
-                    incomingChallengeRewards[bidId].amount = CHALLENGE_AMOUNT + STAKE_AMOUNT / 4;
-                }
-                challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
-            }
-        } else {
-            // On the source chain during locking(no relaying), revert locking
-            (
-                uint256 bidId,
-                IncomingBidStatus status, // FIXME maybe not useful
-                address receiver,
-                uint256 tokenId,
-                address remoteContract,
-                address relayer,
-                address challenger
-            ) = abi.decode(bidBytes, (uint256, IncomingBidStatus, address, uint256, address, address, address));
-
-            OutgoingBid memory localChallengedBid = outgoingBids[bidId];
-
-            require(localChallengedBid.status != OutgoingBidStatus.None, "SrcSpokeBrdige: There is no corresponding local bid!");
-            require(localChallengedBid.timestampOfBought + 4 hours < block.timestamp, "SrcSpokeBridge: Time window is not expired!");
-
-            if (status != IncomingBidStatus.Malicious &&
-                localChallengedBid.receiver == receiver &&
-                localChallengedBid.tokenId == tokenId &&
-                localChallengedBid.remoteErc721Contract == remoteContract &&
-                localChallengedBid.buyer == relayer
-            ) {
-                // False challenging
-                require(false, "SrcSpokeBridge: False challenging!");
-
-            } else {
-                // Proved malicious bid - no relaying
-                localChallengedBid.status = OutgoingBidStatus.Malicious;
-                relayers[localChallengedBid.buyer].status = RelayerStatus.Malicious;
-
-                IERC721(localChallengedBid.localErc721Contract)
-                    .safeTransferFrom(address(this), localChallengedBid.maker, localChallengedBid.tokenId);
-
-                outgoingChallengeRewards[bidId].challenger = challenger;
-                outgoingChallengeRewards[bidId].amount = STAKE_AMOUNT / 4;
-
-                challengedIncomingBids[bidId].status = ChallengeStatus.Proved;
-            }
-        }
-    }
-
-    function unlocking(
-        uint256 _lockingBidId,
+    function addIncomingBid(
         uint256 _bidId,
-        address _to
-    )  public override onlyActiveRelayer {
-        require(outgoingBids[_lockingBidId].status == OutgoingBidStatus.Bought, "SrcSpokeBridge: the outgoing bid is not bought!");
+        bytes32 _hashedTransaction,
+        LibBid.Transaction calldata _transaction
+    ) public override onlyActiveRelayer {
         require(incomingBids[_bidId].status == IncomingBidStatus.None, "SrcSpokeBridge: there is an incoming bid with the same id!");
-        require(outgoingBids[_lockingBidId].timestampOfBought + 4 hours < block.timestamp,
-            "SrcSpokeBridge: the challenging period is not expired yet!");
-
-        require(IERC721(outgoingBids[_lockingBidId].localErc721Contract).ownerOf(outgoingBids[_lockingBidId].tokenId) == address(this),  "SrcSpokeBridge: there is no locked token!");
-
-        outgoingBids[_lockingBidId].status = OutgoingBidStatus.Unlocked;
+        require(keccak256(abi.encode(_transaction.tokenId, _transaction.owner, _transaction.receiver, _transaction.localErc721Contract, _transaction.remoteErc721Contract)) == _hashedTransaction, "SrcSpokeBridge: Not matching hash!");
+        require(IERC721(_transaction.localErc721Contract).ownerOf(_transaction.tokenId) == address(this),  "SrcSpokeBridge: there is no locked token!");
 
         incomingBids[_bidId] = IncomingBid({
-            outgoingId:_lockingBidId,
             status:IncomingBidStatus.Relayed,
-            receiver:_to,
-            tokenId:outgoingBids[_lockingBidId].tokenId,
-            remoteErc721Contract:outgoingBids[_lockingBidId].localErc721Contract,
+            hashedTransaction:_hashedTransaction,
             timestampOfRelayed:block.timestamp,
             relayer:_msgSender()
         });
     }
 
-    function claimNFT(uint256 _incomingBidId) external {
-        IncomingBid memory bid = incomingBids[_incomingBidId];
-
-        require(bid.status == IncomingBidStatus.Relayed,
+    function claimNFT(
+        uint256 _incomingBidId, 
+        LibBid.Transaction calldata _transaction
+    ) public override {
+        require(incomingBids[_incomingBidId].status == IncomingBidStatus.Relayed,
             "SrcSpokeBride: incoming bid has no Relayed state!");
-        require(bid.timestampOfRelayed + 4 hours < block.timestamp,
+        require(incomingBids[_incomingBidId].timestampOfRelayed + 4 hours < block.timestamp,
             "SrcSpokeBridge: the challenging period is not expired yet!");
-        require(bid.receiver == _msgSender(), "SrcSpokeBridge: claimer is not the owner!");
+        require(keccak256(abi.encode(_transaction.tokenId, _transaction.owner, _transaction.receiver, _transaction.localErc721Contract, _transaction.remoteErc721Contract)) == incomingBids[_incomingBidId].hashedTransaction, "SrcSpokeBridge: Not matching hash!");
 
-        bid.status = IncomingBidStatus.Unlocked;
-        IERC721(outgoingBids[incomingBids[_incomingBidId].outgoingId].localErc721Contract)
-            .safeTransferFrom(address(this), _msgSender(), bid.tokenId);
+        require(_transaction.receiver == _msgSender(), "SrcSpokeBridge: claimer is not the owner!");
+
+        incomingBids[_incomingBidId].status = IncomingBidStatus.Unlocked;
+        IERC721(_transaction.localErc721Contract).safeTransferFrom(address(this), _msgSender(), _transaction.tokenId);
     }
 }

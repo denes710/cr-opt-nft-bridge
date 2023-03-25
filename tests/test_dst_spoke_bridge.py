@@ -61,15 +61,15 @@ def test_relayer_relaying(init_contracts):
 
     dstSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    dstSpokeBridge.minting(0, receiver, 1, wrappedErc721.address, {'from': relayer})
+    transaction = [1, user, receiver, wrappedErc721.address, wrappedErc721.address]
+    transactionHash = dstSpokeBridge.getTransactionHash(transaction)
+
+    dstSpokeBridge.addIncomingBid(0, transactionHash, transaction, {'from': relayer});
 
     retBid = dstSpokeBridge.incomingBids(0)
     assert retBid["status"] == 1
-    assert retBid["tokenId"] == 1
-    assert retBid["remoteErc721Contract"] == wrappedErc721.address
-    assert retBid["receiver"] == receiver
+    assert retBid["hashedTransaction"] == transactionHash
     assert retBid["relayer"] == relayer
-
     assert wrappedErc721.ownerOf(1) == receiver
 
 def test_user_creating_bid(init_contracts):
@@ -82,26 +82,31 @@ def test_user_creating_bid(init_contracts):
 
     dstSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    dstSpokeBridge.minting(0, receiver, 1, wrappedErc721.address, {'from': relayer})
+    transaction = [1, user, receiver, wrappedErc721.address, wrappedErc721.address]
+    transactionHash = dstSpokeBridge.getTransactionHash(transaction)
+
+    dstSpokeBridge.addIncomingBid(0, transactionHash, transaction, {'from': relayer});
 
     wrappedErc721.approve(dstSpokeBridge.address, 1, {'from': receiver})
 
     with reverts("DstSpokeBridge: there is no fee for relayers!"):
-        dstSpokeBridge.createBid(user, 1, wrappedErc721.address, 0, {'from': user})
+        dstSpokeBridge.createBid(user, 0, transaction, {'from': user})
     with reverts("DstSpokeBridge: too early unwrapping!"):
-        dstSpokeBridge.createBid(user, 1, wrappedErc721.address, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
+        dstSpokeBridge.createBid(user, 0, transaction, {'from': receiver, 'amount': Wei("0.01 ether")})
 
     chain.sleep(14400000) # it's 4 hours
 
-    with reverts("ERC721: transfer from incorrect owner"):
-        dstSpokeBridge.createBid(user, 1, wrappedErc721.address, 0, {'from': user, 'amount': Wei("0.01 ether")})
+    with reverts("DstSpokeBridge: caller is not the owner!"):
+        dstSpokeBridge.createBid(user, 0, transaction, {'from': user, 'amount': Wei("0.01 ether")})
 
-    dstSpokeBridge.createBid(user, 1, wrappedErc721.address, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
+    dstSpokeBridge.createBid(user, 0, transaction, {'from': receiver, 'amount': Wei("0.01 ether")})
+
+    transaction = [1, receiver, user, wrappedErc721.address, wrappedErc721.address]
+    transactionHash = dstSpokeBridge.getTransactionHash(transaction)
 
     retBid = dstSpokeBridge.outgoingBids(0)
     assert retBid["status"] == 1
-    assert retBid["receiver"] == user
-    assert retBid["tokenId"] == 1
+    assert retBid["hashedTransaction"] == transactionHash
 
 def test_relayer_buying_bid(init_contracts):
     dstSpokeBridge, wrappedErc721 = init_contracts
@@ -113,12 +118,15 @@ def test_relayer_buying_bid(init_contracts):
 
     dstSpokeBridge.deposite({'from': relayer, 'amount': Wei("20 ether")})
 
-    dstSpokeBridge.minting(0, receiver, 1, wrappedErc721.address, {'from': relayer})
+    transaction = [1, user, receiver, wrappedErc721.address, wrappedErc721.address]
+    transactionHash = dstSpokeBridge.getTransactionHash(transaction)
+
+    dstSpokeBridge.addIncomingBid(0, transactionHash, transaction, {'from': relayer});
 
     chain.sleep(14400000) # it's 4 hours
 
     wrappedErc721.approve(dstSpokeBridge.address, 1, {'from': receiver})
-    dstSpokeBridge.createBid(user, 1, wrappedErc721.address, 0, {'from': receiver, 'amount': Wei("0.01 ether")})
+    dstSpokeBridge.createBid(user, 0, transaction, {'from': receiver, 'amount': Wei("0.01 ether")})
 
     with reverts("SpokeBridge: caller is not a relayer!"):
         dstSpokeBridge.buyBid(0, {'from': person});
@@ -132,4 +140,4 @@ def test_relayer_buying_bid(init_contracts):
 
     retBid = dstSpokeBridge.outgoingBids(0)
     assert retBid["status"] == 2
-    assert retBid["buyer"] == relayer
+    assert retBid["relayer"] == relayer
