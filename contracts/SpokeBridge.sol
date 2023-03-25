@@ -97,17 +97,19 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     uint256 public firstMaliciousBlockHeight;
 
     // constant
-    uint256 public immutable STAKE_AMOUNT;
+    uint256 public STAKE_AMOUNT;
 
-    uint256 public immutable CHALLENGE_AMOUNT;
+    uint256 public CHALLENGE_AMOUNT;
 
-    uint256 public immutable TIME_LIMIT_OF_UNDEPOSIT;
+    uint256 public TIME_LIMIT_OF_UNDEPOSIT;
 
-    uint256 public immutable TRANS_PER_BLOCK;
+    uint256 public TRANS_PER_BLOCK;
 
-    uint256 public immutable TRANS_FEE;
+    uint256 public TRANS_FEE;
 
-    address public immutable HUB;
+    address public HUB;
+
+    uint256 public CHALLENGE_PERIOD_TIME;
 
     constructor(address _hub, uint256 _transferPerBlock, uint256 _transFee) {
         HUB = _hub;
@@ -116,6 +118,35 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         TIME_LIMIT_OF_UNDEPOSIT = 2 days;
         TRANS_PER_BLOCK = _transferPerBlock;
         TRANS_FEE = _transFee;
+        CHALLENGE_PERIOD_TIME =  1 minutes;
+    }
+
+    function setChallengePeriod(uint256 _timePeriod) public onlyOwner {
+        CHALLENGE_PERIOD_TIME = _timePeriod;
+    }
+
+    function setStakeAmount(uint256 _stakeAmount) public onlyOwner {
+        STAKE_AMOUNT = _stakeAmount;
+    }
+
+    function setChallengeAmount(uint256 _challengeAmount) public onlyOwner {
+        CHALLENGE_AMOUNT = _challengeAmount;
+    }
+
+    function setTimeLimitOfUndeposit(uint256 _limit) public onlyOwner {
+        TIME_LIMIT_OF_UNDEPOSIT = _limit;
+    }
+
+    function setTransPerBlock(uint256 _limit) public onlyOwner {
+        TRANS_PER_BLOCK = _limit;
+    }
+
+    function setTransactionFee(uint256 _fee) public onlyOwner {
+        TRANS_FEE = _fee;
+    }
+
+    function setHub(address _hub) public onlyOwner {
+        HUB = _hub;
     }
 
     modifier onlyInActiveStatus() {
@@ -270,7 +301,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
         require(msg.value == CHALLENGE_AMOUNT, "SpokeBridge: No enough amount of ETH to stake!");
         require(incomingBlocks[_height].status == IncomingBlockStatus.Relayed,
             "SpokeBridge: Corresponding incoming bid status is not relayed!");
-        require(incomingBlocks[_height].timestampOfIncoming + 4 hours > block.timestamp,
+        require(incomingBlocks[_height].timestampOfIncoming + CHALLENGE_PERIOD_TIME > block.timestamp,
             "SpokeBridge: The dispute period is expired!");
         require(challengedIncomingBlocks[_height].status == ChallengeStatus.None,
             "SpokeBridge: bid is already challenged!");

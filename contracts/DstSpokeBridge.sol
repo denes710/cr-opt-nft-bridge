@@ -39,7 +39,7 @@ abstract contract DstSpokeBridge is SpokeBridge {
             "DstSpokeBridge: proof is not correct unwrapping!");
         require(IWrappedERC721(_transaction.remoteErc721Contract).ownerOf(_transaction.tokenId) == _msgSender(),
             "DstSpokeBridge: owner is not the caller!");
-        require(incomingBlocks[_incomingBlockId].timestampOfIncoming + 4 hours < block.timestamp,
+        require(incomingBlocks[_incomingBlockId].timestampOfIncoming + CHALLENGE_PERIOD_TIME < block.timestamp,
             "DesSpokeBridge: challenging time window is not expired yet!");
 
         IWrappedERC721(_transaction.remoteErc721Contract).burn(_transaction.tokenId);

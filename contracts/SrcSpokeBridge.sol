@@ -65,7 +65,7 @@ abstract contract SrcSpokeBridge is SpokeBridge {
         require(incomingBlock.status == IncomingBlockStatus.Relayed,
             "SrcSpokeBride: incoming block has no Relayed state!");
 
-        require(incomingBlock.timestampOfIncoming + 4 hours < block.timestamp,
+        require(incomingBlock.timestampOfIncoming + CHALLENGE_PERIOD_TIME < block.timestamp,
             "SrcSpokeBridge: the challenging period is not expired yet!");
 
         require(relayers[incomingBlock.relayer].status == RelayerStatus.Active,
