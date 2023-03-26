@@ -147,7 +147,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
 
     function sendProof(uint256 _height) public override {
         // we can send a calculated merkle proof about localBlocks, it is always a trusted event
-        bytes32 calculatedRoot = _height < localBlockId.current() ?
+        bytes32 calculatedRoot = _height > localBlockId.current() ?
             bytes32(0) : _getMerkleRoot(_height);
         bytes memory data = abi.encode(_height, calculatedRoot);
         _sendMessage(data);
@@ -323,7 +323,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function _getMerkleRoot(uint256 _height) internal view returns (bytes32) {
         uint size = localBlocks[_height].length.current();
 
-        bytes32[] memory hashes = new bytes32[](size);
+        bytes32[] memory hashes = new bytes32[](size * 2 - 1);
 
         uint32 idx = 0;
         for (uint i = 0; i < size; i++) {
