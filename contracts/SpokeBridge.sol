@@ -157,7 +157,7 @@ abstract contract SpokeBridge is ISpokeBridge, Ownable {
     function receiveProof(bytes memory _root) public override onlyHub {
         require(status != BridgeStatus.Active, "SpokeBridge: bride status is active!");
 
-        (uint32 height, bytes32 calculatedRoot) = abi.decode(_root, (uint32, bytes32));
+        (uint256 height, bytes32 calculatedRoot) = abi.decode(_root, (uint256, bytes32));
 
         IncomingBlock storage incomingBlock = incomingBlocks[height];
 
